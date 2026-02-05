@@ -53,9 +53,8 @@ public class UserTicket {
         this.ticketingAt = LocalDateTime.now();
     }
 
-    /**
-     * 팔찌 수령 처리
-     */
+    // 팔찌 수령 처리
+    // 티켓 상태를 ISSUED로 변경하고 수령 시간과 발급 관리자 기록
     public void issue(User admin) {
         this.status = TicketStatus.ISSUED;
         this.issuedAt = LocalDateTime.now();

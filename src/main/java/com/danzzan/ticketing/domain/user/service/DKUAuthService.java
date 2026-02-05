@@ -26,9 +26,10 @@ public class DKUAuthService {
     private final DkuAuthenticationService dkuAuthenticationService;
     private final DkuStudentService dkuStudentService;
 
-    /**
-     * 단국대 학생 인증
-     */
+    // 단국대 포털을 통해 학생 인증 진행
+    // 1. 이미 가입된 학번인지 확인
+    // 2. 단국대 포털에 로그인하여 학생 정보 크롤링
+    // 3. 재학생인지 확인 후 회원가입 토큰 발급
     public ResponseVerifyStudentDto verifyStudent(RequestDkuStudentDto dto) {
         // 이미 가입된 학번인지 체크
         if (userRepository.existsByStudentId(dto.getDkuStudentId())) {
@@ -62,7 +63,7 @@ public class DKUAuthService {
                 academicStatus
         );
 
-        // 응답 생성
+        // 응답 DTO 생성
         ResponseScrappedStudentInfoDto studentDto = new ResponseScrappedStudentInfoDto(
                 studentInfo.getStudentName(),
                 studentInfo.getStudentId(),
@@ -73,9 +74,7 @@ public class DKUAuthService {
         return new ResponseVerifyStudentDto(signupToken, studentDto);
     }
 
-    /**
-     * 회원가입 토큰으로 학생 정보 조회
-     */
+    // 회원가입 토큰으로 캐시에서 학생 정보 조회
     public ResponseScrappedStudentInfoDto getStudentInfo(String signupToken) {
         SignupService.StudentInfoCache cache = signupService.getCachedStudentInfo(signupToken);
         return new ResponseScrappedStudentInfoDto(
@@ -83,12 +82,11 @@ public class DKUAuthService {
         );
     }
 
-    /**
-     * 학적 상태 문자열을 AcademicStatus로 변환
-     */
+    // 학적 상태 문자열을 AcademicStatus enum으로 변환
+    // "재학", "휴학", "졸업" 등의 문자열을 파싱
     private AcademicStatus parseAcademicStatus(String status) {
         if (status == null || status.isEmpty()) {
-            return AcademicStatus.ENROLLED;  // 기본값
+            return AcademicStatus.ENROLLED;
         }
 
         String normalized = status.trim();
@@ -101,7 +99,7 @@ public class DKUAuthService {
             return AcademicStatus.GRADUATED;
         }
 
-        // 알 수 없는 상태는 재학으로 처리 (보수적 접근)
+        // 알 수 없는 상태는 일단 재학으로 처리
         log.warn("알 수 없는 학적 상태: {}", status);
         return AcademicStatus.ENROLLED;
     }

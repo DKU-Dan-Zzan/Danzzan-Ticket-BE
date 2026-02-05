@@ -3,9 +3,8 @@ package com.danzzan.ticketing.infra.dku.model;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 
-/**
- * 단국대 포털에서 가져온 학생 정보
- */
+// 단국대 포털에서 가져온 학생 정보
+// DkuStudentService에서 크롤링한 데이터를 담는 DTO
 @Getter
 @RequiredArgsConstructor
 public class StudentInfo {

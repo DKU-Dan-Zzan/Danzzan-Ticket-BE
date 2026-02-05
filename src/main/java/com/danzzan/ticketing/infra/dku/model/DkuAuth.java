@@ -4,9 +4,8 @@ import lombok.Getter;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
 
-/**
- * 단국대 포털 인증 정보 (쿠키)
- */
+// 단국대 포털 인증 정보
+// 로그인 후 발급받은 세션 쿠키를 저장하고 관리
 @Getter
 public class DkuAuth {
 
@@ -29,10 +28,8 @@ public class DkuAuth {
         this.cookies.add(name, value);
     }
 
-    /**
-     * 쿠키를 HTTP 요청 헤더 형식으로 변환
-     * 예: "JSESSIONID=xxx; WMONID=yyy"
-     */
+    // 쿠키를 HTTP 요청 헤더 형식으로 변환
+    // 예: "JSESSIONID=xxx; WMONID=yyy"
     public String toCookieHeader() {
         StringBuilder sb = new StringBuilder();
         cookies.forEach((name, values) -> {

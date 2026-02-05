@@ -8,11 +8,9 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 
-/**
- * 사용자 정보 캐시 - 메모리 구현체
- * 서버 재시작 시 캐시가 초기화됨
- * 추후 Redis로 변경 가능
- */
+// 사용자 정보 캐시 - 메모리 구현체
+// 서버 재시작 시 캐시가 초기화됨
+// 추후 Redis로 변경 가능
 @Repository
 public class UserInfoMemoryRepositoryImpl implements UserInfoMemoryRepository {
 

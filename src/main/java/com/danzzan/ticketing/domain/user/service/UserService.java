@@ -21,9 +21,8 @@ public class UserService {
     private final UserInfoService userInfoService;
     private final PasswordEncoder passwordEncoder;
 
-    /**
-     * 로그인
-     */
+    // 로그인 처리
+    // 학번으로 사용자 조회 후 비밀번호 검증
     public ResponseLoginDto login(RequestLoginDto dto) {
         User user = userRepository.findByStudentId(dto.getStudentId())
                 .orElseThrow(UserNotFoundException::new);
@@ -35,15 +34,14 @@ public class UserService {
         // 로그인 성공 시 사용자 정보 캐시에 저장
         userInfoService.cacheUserInfo(user.getId(), user);
 
-        // TODO: JWT 토큰 발급 구현 필요
+        // TODO: JWT 토큰 발급 구현
         return new ResponseLoginDto("access-token-temp", "refresh-token-temp");
     }
 
-    /**
-     * 토큰 재발급
-     */
+    // 토큰 재발급
+    // Access Token 만료 시 Refresh Token으로 새 토큰 발급
     public ResponseRefreshTokenDto refreshToken(String accessToken, String refreshToken) {
-        // TODO: JWT 토큰 재발급 구현 필요
+        // TODO: JWT 토큰 재발급 구현
         return new ResponseRefreshTokenDto("new-access-token-temp", "new-refresh-token-temp");
     }
 }

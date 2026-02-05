@@ -21,20 +21,16 @@ public class SignupService {
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
 
-    // 임시 저장소 (실제로는 Redis 사용 권장)
+    // TODO: Redis로 교체 예정
     private final Map<String, StudentInfoCache> signupCache = new ConcurrentHashMap<>();
 
-    /**
-     * 학생 정보 임시 저장
-     */
+    // 학생 정보 임시 저장
     public void cacheStudentInfo(String signupToken, String studentId, String name,
                                   String college, String major, AcademicStatus academicStatus) {
         signupCache.put(signupToken, new StudentInfoCache(studentId, name, college, major, academicStatus));
     }
 
-    /**
-     * 캐시에서 학생 정보 조회
-     */
+    // 캐시에서 학생 정보 조회
     public StudentInfoCache getCachedStudentInfo(String signupToken) {
         StudentInfoCache cache = signupCache.get(signupToken);
         if (cache == null) {
@@ -43,9 +39,7 @@ public class SignupService {
         return cache;
     }
 
-    /**
-     * 회원가입 완료
-     */
+    // 회원가입 처리
     @Transactional
     public void signup(RequestSignupDto dto, String signupToken) {
         StudentInfoCache cache = getCachedStudentInfo(signupToken);
@@ -55,10 +49,9 @@ public class SignupService {
             throw new AlreadyStudentIdException();
         }
 
-        // 비밀번호 암호화
+        // 비밀번호 암호화 후 저장
         String encodedPassword = passwordEncoder.encode(dto.getPassword());
 
-        // User 생성 및 저장
         User user = User.builder()
                 .studentId(cache.studentId())
                 .password(encodedPassword)
@@ -70,12 +63,9 @@ public class SignupService {
                 .build();
 
         userRepository.save(user);
-
-        // 캐시 삭제
         signupCache.remove(signupToken);
     }
 
-    // 임시 캐시용 내부 클래스
     public record StudentInfoCache(
             String studentId,
             String name,

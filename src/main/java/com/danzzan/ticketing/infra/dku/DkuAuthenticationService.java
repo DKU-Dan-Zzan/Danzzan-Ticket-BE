@@ -15,10 +15,8 @@ import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 
-/**
- * 단국대 포털 인증 서비스
- * 웹정보시스템(webinfo.dankook.ac.kr)에 로그인하여 인증 쿠키를 획득
- */
+// 단국대 포털 인증 서비스
+// webinfo.dankook.ac.kr에 로그인하여 인증 쿠키 획득
 @Slf4j
 @Service
 public class DkuAuthenticationService {
@@ -38,13 +36,10 @@ public class DkuAuthenticationService {
                 .build();
     }
 
-    /**
-     * 단국대 웹정보시스템에 로그인
-     *
-     * @param studentId 학번
-     * @param password  비밀번호
-     * @return 인증된 쿠키 정보
-     */
+    // 단국대 웹정보시스템 로그인
+    // @param studentId 학번
+    // @param password 비밀번호
+    // @return 인증된 쿠키 정보
     public DkuAuth login(String studentId, String password) {
         DkuAuth auth = new DkuAuth();
 
@@ -60,9 +55,7 @@ public class DkuAuthenticationService {
         return auth;
     }
 
-    /**
-     * 초기 페이지 접속하여 세션 쿠키 획득
-     */
+    // 초기 페이지 접속하여 세션 쿠키 획득
     private void getInitialCookies(DkuAuth auth) {
         try {
             ClientResponse response = webClient.get()
@@ -78,9 +71,7 @@ public class DkuAuthenticationService {
         }
     }
 
-    /**
-     * 로그인 수행
-     */
+    // 실제 로그인 수행
     private boolean performLogin(DkuAuth auth, String studentId, String password) {
         try {
             // 로그인 파라미터 구성
@@ -101,20 +92,18 @@ public class DkuAuthenticationService {
                 return false;
             }
 
-            // 쿠키 추출
             extractCookies(response, auth);
 
             // 로그인 성공 여부 확인
-            // 로그인 성공 시 리다이렉트 또는 특정 쿠키가 설정됨
             int statusCode = response.statusCode().value();
             String body = response.bodyToMono(String.class).block();
 
-            // 로그인 실패 시 에러 메시지가 포함됨
+            // 실패 시 에러 메시지 포함됨
             if (body != null && (body.contains("실패") || body.contains("일치하지") || body.contains("error"))) {
                 return false;
             }
 
-            // 302 리다이렉트 또는 200 OK면 성공으로 판단
+            // 302 리다이렉트 또는 200 OK면 성공
             return statusCode == 200 || statusCode == 302;
 
         } catch (Exception e) {
@@ -123,9 +112,7 @@ public class DkuAuthenticationService {
         }
     }
 
-    /**
-     * 응답에서 쿠키 추출
-     */
+    // 응답 헤더에서 쿠키 추출
     private void extractCookies(ClientResponse response, DkuAuth auth) {
         List<String> setCookieHeaders = response.headers().header(HttpHeaders.SET_COOKIE);
         MultiValueMap<String, String> cookies = new LinkedMultiValueMap<>();

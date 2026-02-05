@@ -11,15 +11,13 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.WebClient;
 
-/**
- * 단국대 학생 정보 스크래핑 서비스
- */
+// 단국대 학생 정보 스크래핑 서비스
 @Slf4j
 @Service
 public class DkuStudentService {
 
     private static final String WEBINFO_URL = "https://webinfo.dankook.ac.kr";
-    private static final String STUDENT_INFO_PATH = "/member/getMember.do";  // 학생 정보 페이지
+    private static final String STUDENT_INFO_PATH = "/member/getMember.do";
     private static final String USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
 
     private final WebClient webClient;
@@ -31,15 +29,11 @@ public class DkuStudentService {
                 .build();
     }
 
-    /**
-     * 인증된 세션으로 학생 정보 크롤링
-     *
-     * @param auth 인증 쿠키
-     * @return 학생 정보
-     */
+    // 인증된 세션으로 학생 정보 크롤링
+    // @param auth 인증 쿠키
+    // @return 학생 정보
     public StudentInfo crawlStudentInfo(DkuAuth auth) {
         try {
-            // 학생 정보 페이지 요청
             String html = webClient.get()
                     .uri(STUDENT_INFO_PATH)
                     .header(HttpHeaders.COOKIE, auth.toCookieHeader())
@@ -61,14 +55,12 @@ public class DkuStudentService {
         }
     }
 
-    /**
-     * HTML에서 학생 정보 파싱
-     */
+    // HTML에서 학생 정보 파싱
     private StudentInfo parseStudentInfo(String html) {
         Document doc = Jsoup.parse(html);
 
-        // 단국대 웹정보시스템의 HTML 구조에 맞게 파싱
-        // 실제 구조에 따라 수정이 필요할 수 있음
+        // 단국대 웹정보시스템 HTML 구조에 맞게 파싱
+        // 실제 구조에 따라 수정 필요할 수 있음
         String studentName = getValueById(doc, "userName", "name");
         String studentId = getValueById(doc, "userNumber", "hakbun");
         String college = getValueById(doc, "college", "collNm");
@@ -76,9 +68,8 @@ public class DkuStudentService {
         String academicStatus = getValueById(doc, "status", "hakjeok");
         String yearStr = getValueById(doc, "admissionYear", "ipYear");
 
-        // 값 검증
+        // 값이 없으면 테이블에서 추출 시도
         if (studentId == null || studentId.isEmpty()) {
-            // 다른 방식으로 시도 (테이블에서 추출)
             studentName = getValueFromTable(doc, "성명", "이름");
             studentId = getValueFromTable(doc, "학번");
             college = getValueFromTable(doc, "단과대학", "대학");
@@ -110,12 +101,9 @@ public class DkuStudentService {
         );
     }
 
-    /**
-     * ID나 name 속성으로 값 추출
-     */
+    // ID나 name 속성으로 값 추출
     private String getValueById(Document doc, String... ids) {
         for (String id : ids) {
-            // input 요소
             Element element = doc.getElementById(id);
             if (element != null) {
                 String value = element.val();
@@ -146,10 +134,8 @@ public class DkuStudentService {
         return null;
     }
 
-    /**
-     * 테이블에서 라벨로 값 추출
-     * 예: <th>학번</th><td>32100000</td>
-     */
+    // 테이블에서 라벨로 값 추출
+    // 예: <th>학번</th><td>32100000</td>
     private String getValueFromTable(Document doc, String... labels) {
         for (String label : labels) {
             // th-td 구조
