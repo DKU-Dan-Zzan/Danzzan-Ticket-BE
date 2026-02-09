@@ -3,6 +3,7 @@ package com.danzzan.ticketing.domain.admin.event.service;
 import com.danzzan.ticketing.domain.admin.event.dto.EventListResponseDTO;
 import com.danzzan.ticketing.domain.admin.event.dto.EventStatsResponseDTO;
 import com.danzzan.ticketing.domain.admin.event.dto.EventSummaryDTO;
+import com.danzzan.ticketing.domain.event.exception.EventNotFoundException;
 import com.danzzan.ticketing.domain.event.model.entity.FestivalEvent;
 import com.danzzan.ticketing.domain.event.repository.FestivalEventRepository;
 import com.danzzan.ticketing.domain.ticket.model.entity.TicketStatus;
@@ -51,7 +52,7 @@ public class AdminEventServiceImpl implements AdminEventService {
     @Override
     public EventStatsResponseDTO getEventStats(Long eventId) {
         FestivalEvent event = festivalEventRepository.findById(eventId)
-                .orElseThrow(() -> new IllegalArgumentException("공연을 찾을 수 없습니다."));
+                .orElseThrow(EventNotFoundException::new);
 
         long totalTickets = userTicketRepository.countByEventId(eventId);
         long ticketsConfirmed = userTicketRepository.countByEventIdAndStatus(eventId, TicketStatus.CONFIRMED);
@@ -59,7 +60,7 @@ public class AdminEventServiceImpl implements AdminEventService {
 
         int totalCapacity = event.getTotalCapacity();
         int remainingCapacity = Math.max(0, totalCapacity - (int) totalTickets);
-        double issueRate = totalCapacity == 0 ? 0.0 : ((double) ticketsIssued / totalCapacity) * 100.0;
+        double issueRate = totalTickets == 0 ? 0.0 : ((double) ticketsIssued / totalTickets) * 100.0;
 
         return EventStatsResponseDTO.builder()
                 .eventId(event.getId())

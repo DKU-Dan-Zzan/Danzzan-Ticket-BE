@@ -2,6 +2,7 @@ package com.danzzan.ticketing.global.exception;
 
 import com.danzzan.ticketing.domain.admin.auth.exception.AdminAuthenticationException;
 import com.danzzan.ticketing.domain.admin.auth.exception.AdminForbiddenException;
+import com.danzzan.ticketing.domain.event.exception.EventNotFoundException;
 import com.danzzan.ticketing.domain.ticket.exception.TicketAlreadyIssuedException;
 import com.danzzan.ticketing.domain.ticket.exception.TicketEventMismatchException;
 import com.danzzan.ticketing.domain.ticket.exception.TicketNotFoundException;
@@ -45,6 +46,12 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ApiResponse<Void>> handleTicketNotFound(TicketNotFoundException e) {
         return ResponseEntity.status(HttpStatus.NOT_FOUND)
                 .body(ApiResponse.error("TICKET_NOT_FOUND", e.getMessage()));
+    }
+
+    @ExceptionHandler(EventNotFoundException.class)
+    public ResponseEntity<ApiResponse<Void>> handleEventNotFound(EventNotFoundException e) {
+        return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                .body(ApiResponse.error("EVENT_NOT_FOUND", e.getMessage()));
     }
 
     @ExceptionHandler(TicketEventMismatchException.class)

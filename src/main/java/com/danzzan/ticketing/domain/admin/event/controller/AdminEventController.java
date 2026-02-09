@@ -83,6 +83,45 @@ public class AdminEventController {
 
     @PreAuthorize("hasRole('ADMIN')")
     @GetMapping("/events/{eventId}/stats")
+    @Operation(
+            summary = "팔찌 지급 통계 조회",
+            description = "공연별 전체 티켓 수 및 팔찌 지급 완료 수 통계 조회"
+    )
+    @SecurityRequirement(name = "bearerAuth")
+    @ApiResponses({
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                    responseCode = "200",
+                    description = "통계 조회 성공",
+                    content = @Content(
+                            mediaType = "application/json",
+                            schema = @Schema(implementation = ApiResponse.class),
+                            examples = @ExampleObject(
+                                    name = "success",
+                                    value = """
+                                            {
+                                              "success": true,
+                                              "data": {
+                                                "eventId": 2,
+                                                "title": "5월 13일 공연 팔찌 배부",
+                                                "eventDate": "2026-05-13",
+                                                "totalCapacity": 5000,
+                                                "totalTickets": 4820,
+                                                "ticketsConfirmed": 310,
+                                                "ticketsIssued": 4510,
+                                                "issueRate": 93.57,
+                                                "remainingCapacity": 180
+                                              },
+                                              "error": null
+                                            }
+                                            """
+                            )
+                    )
+            ),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "인증 실패"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "권한 없음"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "해당 공연(eventId)이 존재하지 않음"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "500", description = "서버 오류")
+    })
     public ApiResponse<EventStatsResponseDTO> getEventStats(@NotNull @PathVariable Long eventId) {
         return ApiResponse.success(adminEventService.getEventStats(eventId));
     }
