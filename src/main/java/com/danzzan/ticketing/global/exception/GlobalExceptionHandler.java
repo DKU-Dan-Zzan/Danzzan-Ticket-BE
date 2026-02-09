@@ -1,8 +1,15 @@
 package com.danzzan.ticketing.global.exception;
 
+import com.danzzan.ticketing.domain.admin.auth.exception.AdminAuthenticationException;
+import com.danzzan.ticketing.domain.admin.auth.exception.AdminForbiddenException;
+import com.danzzan.ticketing.domain.ticket.exception.TicketAlreadyIssuedException;
+import com.danzzan.ticketing.domain.ticket.exception.TicketEventMismatchException;
+import com.danzzan.ticketing.domain.ticket.exception.TicketNotFoundException;
 import com.danzzan.ticketing.domain.user.exception.AlreadyStudentIdException;
 import com.danzzan.ticketing.domain.user.exception.UserNotFoundException;
 import com.danzzan.ticketing.domain.user.exception.WrongPasswordException;
+import com.danzzan.ticketing.global.model.ApiError;
+import com.danzzan.ticketing.global.model.ApiResponse;
 import com.danzzan.ticketing.infra.dku.exception.DkuFailedCrawlingException;
 import com.danzzan.ticketing.infra.dku.exception.DkuFailedLoginException;
 import org.springframework.http.HttpStatus;
@@ -32,6 +39,47 @@ public class GlobalExceptionHandler {
     public ResponseEntity<Map<String, String>> handleWrongPassword(WrongPasswordException e) {
         return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
                 .body(Map.of("error", e.getMessage()));
+    }
+
+    @ExceptionHandler(TicketNotFoundException.class)
+    public ResponseEntity<ApiResponse<Void>> handleTicketNotFound(TicketNotFoundException e) {
+        return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                .body(ApiResponse.error("TICKET_NOT_FOUND", e.getMessage()));
+    }
+
+    @ExceptionHandler(TicketEventMismatchException.class)
+    public ResponseEntity<ApiResponse<Void>> handleTicketEventMismatch(TicketEventMismatchException e) {
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(ApiResponse.error("EVENT_MISMATCH", e.getMessage()));
+    }
+
+    @ExceptionHandler(TicketAlreadyIssuedException.class)
+    public ResponseEntity<ApiResponse<Void>> handleTicketAlreadyIssued(TicketAlreadyIssuedException e) {
+        ApiError error = ApiError.builder()
+                .error("ALREADY_ISSUED")
+                .message(e.getMessage())
+                .ticketId(e.getTicketId())
+                .issuedAt(e.getIssuedAt())
+                .issuerAdminName(e.getIssuerAdminName())
+                .build();
+        return ResponseEntity.status(HttpStatus.CONFLICT)
+                .body(ApiResponse.<Void>builder()
+                        .success(false)
+                        .data(null)
+                        .error(error)
+                        .build());
+    }
+
+    @ExceptionHandler(AdminAuthenticationException.class)
+    public ResponseEntity<ApiResponse<Void>> handleAdminAuthentication(AdminAuthenticationException e) {
+        return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                .body(ApiResponse.error("UNAUTHORIZED", e.getMessage()));
+    }
+
+    @ExceptionHandler(AdminForbiddenException.class)
+    public ResponseEntity<ApiResponse<Void>> handleAdminForbidden(AdminForbiddenException e) {
+        return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                .body(ApiResponse.error("FORBIDDEN", e.getMessage()));
     }
 
     @ExceptionHandler(DkuFailedLoginException.class)

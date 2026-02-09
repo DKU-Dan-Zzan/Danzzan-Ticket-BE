@@ -23,7 +23,7 @@ import org.springframework.web.bind.annotation.RestController;
 @Validated
 @RestController
 @RequestMapping("/api/admin")
-@Tag(name = "관리자 공연", description = "관리자 공연/운영 관련 API")
+@Tag(name = "관리자 공연", description = "관리자용 공연/운영 관련 API")
 @RequiredArgsConstructor
 public class AdminEventController {
 
@@ -32,7 +32,7 @@ public class AdminEventController {
     @PreAuthorize("hasRole('ADMIN')")
     @GetMapping("/events")
     @Operation(
-            summary = "팔찌 배부 대상 공연 목록 조회",
+            summary = "팔찌배부대상 공연일 기준으로 목록 조회",
             description = "JWT 인증이 필요한 관리자 전용 목록 조회 API"
     )
     @SecurityRequirement(name = "bearerAuth")
