@@ -58,7 +58,7 @@ public class AdminAuthController {
                                                   "studentId": "32221902",
                                                   "role": "ROLE_ADMIN"
                                                 },
-                                                "system": "WRISTBAND"
+                                                "system": "DANSPOT"
                                               },
                                               "error": null
                                             }
