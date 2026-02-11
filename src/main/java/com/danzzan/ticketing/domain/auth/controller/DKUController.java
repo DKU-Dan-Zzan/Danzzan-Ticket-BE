@@ -1,9 +1,9 @@
-package com.danzzan.ticketing.domain.user.controller;
+package com.danzzan.ticketing.domain.auth.controller;
 
-import com.danzzan.ticketing.domain.user.model.dto.request.RequestDkuStudentDto;
-import com.danzzan.ticketing.domain.user.model.dto.response.ResponseScrappedStudentInfoDto;
-import com.danzzan.ticketing.domain.user.model.dto.response.ResponseVerifyStudentDto;
-import com.danzzan.ticketing.domain.user.service.DKUAuthService;
+import com.danzzan.ticketing.domain.auth.dto.RequestDkuStudentDto;
+import com.danzzan.ticketing.domain.auth.dto.ResponseScrappedStudentInfoDto;
+import com.danzzan.ticketing.domain.auth.dto.ResponseVerifyStudentDto;
+import com.danzzan.ticketing.domain.auth.service.DKUAuthService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;

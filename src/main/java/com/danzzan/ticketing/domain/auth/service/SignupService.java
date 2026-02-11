@@ -1,7 +1,7 @@
-package com.danzzan.ticketing.domain.user.service;
+package com.danzzan.ticketing.domain.auth.service;
 
 import com.danzzan.ticketing.domain.user.exception.AlreadyStudentIdException;
-import com.danzzan.ticketing.domain.user.model.dto.request.RequestSignupDto;
+import com.danzzan.ticketing.domain.auth.dto.RequestSignupDto;
 import com.danzzan.ticketing.domain.user.model.entity.AcademicStatus;
 import com.danzzan.ticketing.domain.user.model.entity.User;
 import com.danzzan.ticketing.domain.user.model.entity.UserRole;

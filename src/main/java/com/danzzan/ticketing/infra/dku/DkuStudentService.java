@@ -8,78 +8,187 @@ import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.http.client.reactive.ReactorClientHttpConnector;
 import org.springframework.stereotype.Service;
+import org.springframework.util.MultiValueMap;
 import org.springframework.web.reactive.function.client.WebClient;
+import reactor.netty.http.client.HttpClient;
 
-// 단국대 학생 정보 스크래핑 서비스
+import java.net.URI;
+import java.util.List;
+
 @Slf4j
 @Service
 public class DkuStudentService {
 
     private static final String WEBINFO_URL = "https://webinfo.dankook.ac.kr";
-    private static final String STUDENT_INFO_PATH = "/member/getMember.do";
+    private static final String STUDENT_INFO_PATH = "/tiac/univ/srec/srlm/views/findScregBasWeb.do?_view=ok";
     private static final String USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
 
     private final WebClient webClient;
 
     public DkuStudentService() {
+        HttpClient httpClient = HttpClient.create()
+                .followRedirect(false);
+
         this.webClient = WebClient.builder()
-                .baseUrl(WEBINFO_URL)
+                .clientConnector(new ReactorClientHttpConnector(httpClient))
                 .defaultHeader(HttpHeaders.USER_AGENT, USER_AGENT)
                 .build();
     }
 
-    // 인증된 세션으로 학생 정보 크롤링
-    // @param auth 인증 쿠키
-    // @return 학생 정보
     public StudentInfo crawlStudentInfo(DkuAuth auth) {
         try {
-            String html = webClient.get()
-                    .uri(STUDENT_INFO_PATH)
-                    .header(HttpHeaders.COOKIE, auth.toCookieHeader())
-                    .retrieve()
-                    .bodyToMono(String.class)
-                    .block();
+            MultiValueMap<String, String> cookies = auth.getCookies();
+            log.info("크롤링 시작. 쿠키: {}", cookies.keySet());
+
+            // 학생 정보 페이지 요청
+            String html = fetchStudentInfo(cookies);
 
             if (html == null || html.isEmpty()) {
                 throw new DkuFailedCrawlingException("학생 정보 페이지를 가져올 수 없습니다.");
             }
 
+            log.info("학생 정보 HTML 길이: {}", html.length());
+            // 디버그: HTML을 파일에 저장
+            try {
+                java.nio.file.Files.writeString(
+                    java.nio.file.Path.of("/tmp/dku_student_info.html"), html);
+            } catch (Exception ex) {
+                log.warn("HTML 파일 저장 실패: {}", ex.getMessage());
+            }
+
             return parseStudentInfo(html);
 
-        } catch (DkuFailedCrawlingException e) {
-            throw e;
         } catch (Exception e) {
-            log.error("학생 정보 크롤링 실패: {}", e.getMessage());
+            log.error("학생 정보 크롤링 실패: {}", e.getMessage(), e);
+            // 에러 정보를 파일에 저장
+            try {
+                java.nio.file.Files.writeString(
+                    java.nio.file.Path.of("/tmp/dku_error.txt"),
+                    "Error: " + e.getClass().getName() + ": " + e.getMessage() + "\nCookies: " + auth.getCookies());
+            } catch (Exception ignored) {}
             throw new DkuFailedCrawlingException("학생 정보 크롤링 중 오류가 발생했습니다.");
         }
     }
 
-    // HTML에서 학생 정보 파싱
+    // Cookie 헤더 문자열 생성
+    private String toCookieHeader(MultiValueMap<String, String> cookies) {
+        StringBuilder sb = new StringBuilder();
+        cookies.forEach((name, values) -> {
+            for (String value : values) {
+                if (sb.length() > 0) sb.append("; ");
+                sb.append(name).append("=").append(value);
+            }
+        });
+        return sb.toString();
+    }
+
+    // 학생정보 페이지 직접 요청 (Cookie 헤더로 전달)
+    private String fetchStudentInfo(MultiValueMap<String, String> cookies) {
+        String cookieHeader = toCookieHeader(cookies);
+        log.info("학생정보 요청 Cookie 헤더: {}", cookieHeader);
+
+        ResponseEntity<String> response = webClient.get()
+                .uri(WEBINFO_URL + STUDENT_INFO_PATH)
+                .header(HttpHeaders.COOKIE, cookieHeader)
+                .header(HttpHeaders.REFERER, WEBINFO_URL + "/")
+                .retrieve()
+                .onStatus(status -> false, resp -> null)
+                .toEntity(String.class)
+                .block();
+
+        if (response == null) return null;
+
+        HttpStatus status = (HttpStatus) response.getStatusCode();
+        log.info("학생정보 응답 상태: {}", status);
+
+        if (status == HttpStatus.OK) {
+            return response.getBody();
+        }
+
+        // 302면 SSO 리다이렉트를 따라가야 함
+        if (status == HttpStatus.FOUND || status == HttpStatus.MOVED_TEMPORARILY) {
+            URI location = response.getHeaders().getLocation();
+            log.info("학생정보 리다이렉트: {}", location);
+
+            if (location != null) {
+                // SSO 리다이렉트 체인 따라가기
+                collectCookies(response.getHeaders(), cookies);
+                cookieHeader = toCookieHeader(cookies);
+
+                for (int i = 0; i < 5; i++) {
+                    log.info("학생정보 리다이렉트 {}단계: {}", i + 1, location);
+                    ResponseEntity<String> rResponse = webClient.get()
+                            .uri(location)
+                            .header(HttpHeaders.COOKIE, cookieHeader)
+                            .header(HttpHeaders.REFERER, WEBINFO_URL + "/")
+                            .retrieve()
+                            .onStatus(s -> false, resp -> null)
+                            .toEntity(String.class)
+                            .block();
+
+                    if (rResponse == null) return null;
+                    collectCookies(rResponse.getHeaders(), cookies);
+                    cookieHeader = toCookieHeader(cookies);
+
+                    HttpStatus rStatus = (HttpStatus) rResponse.getStatusCode();
+                    if (rStatus == HttpStatus.OK) {
+                        return rResponse.getBody();
+                    }
+
+                    location = rResponse.getHeaders().getLocation();
+                    if (location == null) {
+                        return rResponse.getBody();
+                    }
+                }
+            }
+        }
+
+        return response.getBody();
+    }
+
+    private void collectCookies(HttpHeaders headers, MultiValueMap<String, String> cookies) {
+        List<String> setCookieHeaders = headers.get(HttpHeaders.SET_COOKIE);
+        if (setCookieHeaders == null) return;
+
+        for (String setCookie : setCookieHeaders) {
+            String[] parts = setCookie.split(";")[0].split("=", 2);
+            if (parts.length == 2) {
+                String name = parts[0].trim();
+                String value = parts[1].trim();
+                cookies.remove(name);
+                cookies.add(name, value);
+            }
+        }
+    }
+
     private StudentInfo parseStudentInfo(String html) {
         Document doc = Jsoup.parse(html);
 
-        // 단국대 웹정보시스템 HTML 구조에 맞게 파싱
-        // 실제 구조에 따라 수정 필요할 수 있음
-        String studentName = getValueById(doc, "userName", "name");
-        String studentId = getValueById(doc, "userNumber", "hakbun");
-        String college = getValueById(doc, "college", "collNm");
-        String major = getValueById(doc, "major", "hakgwa");
-        String academicStatus = getValueById(doc, "status", "hakjeok");
-        String yearStr = getValueById(doc, "admissionYear", "ipYear");
+        String studentName = getElementValue(doc, "nm");
+        String studentId = getElementValue(doc, "stuid");
+        String academicStatus = getElementValue(doc, "scregStaNm");
+        String affiliation = getElementValue(doc, "pstnOrgzNm");
+        String yearStr = getElementValue(doc, "etrsYy");
 
-        // 값이 없으면 테이블에서 추출 시도
         if (studentId == null || studentId.isEmpty()) {
-            studentName = getValueFromTable(doc, "성명", "이름");
-            studentId = getValueFromTable(doc, "학번");
-            college = getValueFromTable(doc, "단과대학", "대학");
-            major = getValueFromTable(doc, "학과", "전공");
-            academicStatus = getValueFromTable(doc, "학적상태", "학적");
-            yearStr = getValueFromTable(doc, "입학년도");
+            log.error("학생 정보 파싱 실패. HTML 앞 500자: {}", html.substring(0, Math.min(500, html.length())));
+            throw new DkuFailedCrawlingException("학생 정보를 파싱할 수 없습니다. 로그인 상태를 확인해주세요.");
         }
 
-        if (studentId == null || studentId.isEmpty()) {
-            throw new DkuFailedCrawlingException("학생 정보를 파싱할 수 없습니다. 로그인 상태를 확인해주세요.");
+        String college = "";
+        String major = "";
+        if (affiliation != null && !affiliation.isEmpty()) {
+            int spaceIdx = affiliation.lastIndexOf(' ');
+            if (spaceIdx > 0) {
+                college = affiliation.substring(0, spaceIdx).trim();
+                major = affiliation.substring(spaceIdx + 1).trim();
+            } else {
+                major = affiliation.trim();
+            }
         }
 
         int yearOfAdmission = 0;
@@ -91,83 +200,39 @@ public class DkuStudentService {
             }
         }
 
+        log.info("학생 정보 파싱 성공: 학번={}, 이름={}, 학적={}", studentId, studentName, academicStatus);
+
         return new StudentInfo(
                 studentName != null ? studentName : "",
                 studentId,
-                college != null ? college : "",
-                major != null ? major : "",
+                college,
+                major,
                 academicStatus != null ? academicStatus : "",
                 yearOfAdmission
         );
     }
 
-    // ID나 name 속성으로 값 추출
-    private String getValueById(Document doc, String... ids) {
-        for (String id : ids) {
-            Element element = doc.getElementById(id);
-            if (element != null) {
-                String value = element.val();
-                if (value != null && !value.isEmpty()) {
-                    return value.trim();
-                }
-                value = element.text();
-                if (value != null && !value.isEmpty()) {
-                    return value.trim();
-                }
+    private String getElementValue(Document doc, String id) {
+        Element element = doc.getElementById(id);
+        if (element != null) {
+            String value = element.val();
+            if (value != null && !value.isEmpty()) {
+                return value.trim();
             }
-
-            // name 속성으로 검색
-            element = doc.selectFirst("[name=" + id + "]");
-            if (element != null) {
-                String value = element.val();
-                if (value != null && !value.isEmpty()) {
-                    return value.trim();
-                }
-            }
-
-            // class로 검색
-            element = doc.selectFirst("." + id);
-            if (element != null) {
-                return element.text().trim();
+            String text = element.text();
+            if (text != null && !text.isEmpty()) {
+                return text.trim();
             }
         }
-        return null;
-    }
 
-    // 테이블에서 라벨로 값 추출
-    // 예: <th>학번</th><td>32100000</td>
-    private String getValueFromTable(Document doc, String... labels) {
-        for (String label : labels) {
-            // th-td 구조
-            Element th = doc.selectFirst("th:contains(" + label + ")");
-            if (th != null) {
-                Element td = th.nextElementSibling();
-                if (td != null && td.tagName().equals("td")) {
-                    return td.text().trim();
-                }
-            }
-
-            // dt-dd 구조
-            Element dt = doc.selectFirst("dt:contains(" + label + ")");
-            if (dt != null) {
-                Element dd = dt.nextElementSibling();
-                if (dd != null && dd.tagName().equals("dd")) {
-                    return dd.text().trim();
-                }
-            }
-
-            // label-span 구조
-            Element labelEl = doc.selectFirst("label:contains(" + label + ")");
-            if (labelEl != null) {
-                Element parent = labelEl.parent();
-                if (parent != null) {
-                    Element span = parent.selectFirst("span");
-                    if (span != null) {
-                        return span.text().trim();
-                    }
-                }
+        Element byName = doc.selectFirst("[name=" + id + "]");
+        if (byName != null) {
+            String value = byName.val();
+            if (value != null && !value.isEmpty()) {
+                return value.trim();
             }
         }
+
         return null;
     }
 }

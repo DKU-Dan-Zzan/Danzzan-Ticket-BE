@@ -2,10 +2,10 @@ package com.danzzan.ticketing.domain.user.controller;
 
 import com.danzzan.ticketing.domain.user.model.dto.request.RequestLoginDto;
 import com.danzzan.ticketing.domain.user.model.dto.request.RequestRefreshTokenDto;
-import com.danzzan.ticketing.domain.user.model.dto.request.RequestSignupDto;
+import com.danzzan.ticketing.domain.auth.dto.RequestSignupDto;
 import com.danzzan.ticketing.domain.user.model.dto.response.ResponseLoginDto;
 import com.danzzan.ticketing.domain.user.model.dto.response.ResponseRefreshTokenDto;
-import com.danzzan.ticketing.domain.user.service.SignupService;
+import com.danzzan.ticketing.domain.auth.service.SignupService;
 import com.danzzan.ticketing.domain.user.service.UserService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;

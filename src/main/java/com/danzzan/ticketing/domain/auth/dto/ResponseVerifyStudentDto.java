@@ -1,4 +1,4 @@
-package com.danzzan.ticketing.domain.user.model.dto.response;
+package com.danzzan.ticketing.domain.auth.dto;
 
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Getter;

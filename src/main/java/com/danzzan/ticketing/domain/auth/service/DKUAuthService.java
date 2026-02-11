@@ -1,9 +1,9 @@
-package com.danzzan.ticketing.domain.user.service;
+package com.danzzan.ticketing.domain.auth.service;
 
 import com.danzzan.ticketing.domain.user.exception.AlreadyStudentIdException;
-import com.danzzan.ticketing.domain.user.model.dto.request.RequestDkuStudentDto;
-import com.danzzan.ticketing.domain.user.model.dto.response.ResponseScrappedStudentInfoDto;
-import com.danzzan.ticketing.domain.user.model.dto.response.ResponseVerifyStudentDto;
+import com.danzzan.ticketing.domain.auth.dto.RequestDkuStudentDto;
+import com.danzzan.ticketing.domain.auth.dto.ResponseScrappedStudentInfoDto;
+import com.danzzan.ticketing.domain.auth.dto.ResponseVerifyStudentDto;
 import com.danzzan.ticketing.domain.user.model.entity.AcademicStatus;
 import com.danzzan.ticketing.domain.user.repository.UserRepository;
 import com.danzzan.ticketing.infra.dku.DkuAuthenticationService;

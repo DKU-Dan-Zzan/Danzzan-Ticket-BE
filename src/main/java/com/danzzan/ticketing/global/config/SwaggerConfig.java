@@ -22,6 +22,7 @@ public class SwaggerConfig {
                                 new SecurityScheme()
                                         .type(SecurityScheme.Type.HTTP)
                                         .scheme("bearer")
-                                        .description("관리자용 임시 Bearer 토큰 (opaque token)")));
+                                        .bearerFormat("JWT")
+                                        .description("JWT Access Token (로그인 후 발급)")));
     }
 }

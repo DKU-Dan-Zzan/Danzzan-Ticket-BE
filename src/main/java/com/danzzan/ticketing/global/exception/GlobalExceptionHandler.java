@@ -1,7 +1,7 @@
 package com.danzzan.ticketing.global.exception;
 
-import com.danzzan.ticketing.domain.admin.auth.exception.AdminAuthenticationException;
-import com.danzzan.ticketing.domain.admin.auth.exception.AdminForbiddenException;
+import com.danzzan.ticketing.global.exception.AdminAuthenticationException;
+import com.danzzan.ticketing.global.exception.AdminForbiddenException;
 import com.danzzan.ticketing.domain.event.exception.EventNotFoundException;
 import com.danzzan.ticketing.domain.ticket.exception.TicketAlreadyIssuedException;
 import com.danzzan.ticketing.domain.ticket.exception.TicketEventMismatchException;
