@@ -1,6 +1,7 @@
 package com.danzzan.ticketing.infra.dku;
 
 import com.danzzan.ticketing.infra.dku.exception.DkuFailedCrawlingException;
+import com.danzzan.ticketing.infra.dku.exception.DkuFailedLoginException;
 import com.danzzan.ticketing.infra.dku.model.DkuAuth;
 import com.danzzan.ticketing.infra.dku.model.StudentInfo;
 import lombok.extern.slf4j.Slf4j;
@@ -62,6 +63,9 @@ public class DkuStudentService {
 
             return parseStudentInfo(html);
 
+        } catch (DkuFailedLoginException e) {
+            // 로그인 실패는 그대로 전파
+            throw e;
         } catch (Exception e) {
             log.error("학생 정보 크롤링 실패: {}", e.getMessage(), e);
             // 에러 정보를 파일에 저장
@@ -175,8 +179,13 @@ public class DkuStudentService {
         String yearStr = getElementValue(doc, "etrsYy");
 
         if (studentId == null || studentId.isEmpty()) {
+            // 로그인 페이지가 반환된 경우 = 세션이 유효하지 않음 (로그인 실패)
+            if (html.contains("logonForm") || html.contains("member/logon.do")) {
+                log.warn("학생 정보 페이지 대신 로그인 페이지가 반환됨 → 로그인 실패");
+                throw new DkuFailedLoginException("단국대 포털 로그인에 실패했습니다. 학번과 비밀번호를 확인해주세요.");
+            }
             log.error("학생 정보 파싱 실패. HTML 앞 500자: {}", html.substring(0, Math.min(500, html.length())));
-            throw new DkuFailedCrawlingException("학생 정보를 파싱할 수 없습니다. 로그인 상태를 확인해주세요.");
+            throw new DkuFailedCrawlingException("학생 정보를 파싱할 수 없습니다.");
         }
 
         String college = "";
