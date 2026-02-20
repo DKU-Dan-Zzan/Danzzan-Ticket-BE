@@ -7,6 +7,7 @@ import com.danzzan.ticketing.domain.ticket.dto.TicketSearchItemDTO;
 import com.danzzan.ticketing.domain.ticket.dto.TicketSearchResponseDTO;
 import com.danzzan.ticketing.domain.ticket.exception.TicketAlreadyIssuedException;
 import com.danzzan.ticketing.domain.ticket.exception.TicketEventMismatchException;
+import com.danzzan.ticketing.domain.ticket.exception.TicketNotIssuedException;
 import com.danzzan.ticketing.domain.ticket.exception.TicketNotFoundException;
 import com.danzzan.ticketing.domain.ticket.model.entity.TicketStatus;
 import com.danzzan.ticketing.domain.ticket.model.entity.UserTicket;
@@ -71,6 +72,31 @@ public class AdminTicketServiceImpl implements AdminTicketService {
                 .issuedAt(ticket.getIssuedAt() != null ? ticket.getIssuedAt().toString() : null)
                 .issuerAdminId(ticket.getIssuerAdmin() != null ? ticket.getIssuerAdmin().getId() : null)
                 .issuerAdminName(ticket.getIssuerAdmin() != null ? ticket.getIssuerAdmin().getName() : null)
+                .build();
+    }
+
+    @Override
+    @Transactional
+    public IssueTicketResponseDTO cancelIssueTicket(Long eventId, Long ticketId) {
+        UserTicket ticket = userTicketRepository.findById(ticketId)
+                .orElseThrow(TicketNotFoundException::new);
+
+        if (!ticket.getEvent().getId().equals(eventId)) {
+            throw new TicketEventMismatchException();
+        }
+
+        if (ticket.getStatus() == TicketStatus.CONFIRMED) {
+            throw new TicketNotIssuedException();
+        }
+
+        ticket.cancelIssue();
+
+        return IssueTicketResponseDTO.builder()
+                .ticketId(ticket.getId())
+                .status(ticket.getStatus())
+                .issuedAt(null)
+                .issuerAdminId(null)
+                .issuerAdminName(null)
                 .build();
     }
 

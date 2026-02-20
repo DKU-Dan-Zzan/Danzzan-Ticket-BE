@@ -75,6 +75,12 @@ public class GlobalExceptionHandler {
                         .build());
     }
 
+    @ExceptionHandler(TicketNotIssuedException.class)
+    public ResponseEntity<ApiResponse<Void>> handleTicketNotIssued(TicketNotIssuedException e) {
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(ApiResponse.error("NOT_ISSUED", e.getMessage()));
+    }
+
     // 티켓팅: 오픈 전 예매 시도
     @ExceptionHandler(EventNotOpenException.class)
     public ResponseEntity<Map<String, String>> handleEventNotOpen(EventNotOpenException e) {

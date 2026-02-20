@@ -60,4 +60,12 @@ public class UserTicket {
         this.issuedAt = LocalDateTime.now();
         this.issuerAdmin = admin;
     }
+
+    // 팔찌 지급 취소
+    // 티켓 상태를 CONFIRMED로 되돌리고 수령 정보 초기화
+    public void cancelIssue() {
+        this.status = TicketStatus.CONFIRMED;
+        this.issuedAt = null;
+        this.issuerAdmin = null;
+    }
 }

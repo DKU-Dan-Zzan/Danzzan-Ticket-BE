@@ -158,4 +158,18 @@ public class AdminTicketController {
         String note = request != null ? request.getNote() : null;
         return ApiResponse.success(adminTicketService.issueTicket(eventId, ticketId, note));
     }
+
+    @PreAuthorize("hasRole('ADMIN')")
+    @PatchMapping("/events/{eventId}/tickets/{ticketId}/cancel")
+    @Operation(
+            summary = "팔찌 지급 취소",
+            description = "티켓 상태를 CONFIRMED로 되돌리고 지급 정보 초기화"
+    )
+    @SecurityRequirement(name = "bearerAuth")
+    public ApiResponse<IssueTicketResponseDTO> cancelIssueTicket(
+            @NotNull @PathVariable Long eventId,
+            @NotNull @PathVariable Long ticketId
+    ) {
+        return ApiResponse.success(adminTicketService.cancelIssueTicket(eventId, ticketId));
+    }
 }
