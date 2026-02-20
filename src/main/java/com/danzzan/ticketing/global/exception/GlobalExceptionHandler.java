@@ -3,9 +3,7 @@ package com.danzzan.ticketing.global.exception;
 import com.danzzan.ticketing.global.exception.AdminAuthenticationException;
 import com.danzzan.ticketing.global.exception.AdminForbiddenException;
 import com.danzzan.ticketing.domain.event.exception.EventNotFoundException;
-import com.danzzan.ticketing.domain.ticket.exception.TicketAlreadyIssuedException;
-import com.danzzan.ticketing.domain.ticket.exception.TicketEventMismatchException;
-import com.danzzan.ticketing.domain.ticket.exception.TicketNotFoundException;
+import com.danzzan.ticketing.domain.ticket.exception.*;
 import com.danzzan.ticketing.domain.user.exception.AlreadyStudentIdException;
 import com.danzzan.ticketing.domain.user.exception.UserNotFoundException;
 import com.danzzan.ticketing.domain.user.exception.WrongPasswordException;
@@ -75,6 +73,27 @@ public class GlobalExceptionHandler {
                         .data(null)
                         .error(error)
                         .build());
+    }
+
+    // 티켓팅: 오픈 전 예매 시도
+    @ExceptionHandler(EventNotOpenException.class)
+    public ResponseEntity<Map<String, String>> handleEventNotOpen(EventNotOpenException e) {
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(Map.of("error", e.getMessage()));
+    }
+
+    // 티켓팅: 정원 초과 (입력 중 마감)
+    @ExceptionHandler(EventSoldOutException.class)
+    public ResponseEntity<Map<String, String>> handleEventSoldOut(EventSoldOutException e) {
+        return ResponseEntity.status(HttpStatus.CONFLICT)
+                .body(Map.of("error", e.getMessage()));
+    }
+
+    // 티켓팅: 이미 예매한 공연
+    @ExceptionHandler(AlreadyReservedException.class)
+    public ResponseEntity<Map<String, String>> handleAlreadyReserved(AlreadyReservedException e) {
+        return ResponseEntity.status(HttpStatus.CONFLICT)
+                .body(Map.of("error", e.getMessage()));
     }
 
     @ExceptionHandler(AdminAuthenticationException.class)

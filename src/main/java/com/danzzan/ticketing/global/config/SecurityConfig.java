@@ -46,6 +46,8 @@ public class SecurityConfig {
                         .requestMatchers("/user/reissue").permitAll()
                         .requestMatchers("/user/dku/**").permitAll()
                         .requestMatchers("/user/{signup-token}").permitAll()
+                        // 이벤트 목록은 비로그인도 조회 가능
+                        .requestMatchers("/tickets/events").permitAll()
                         // 관리자 API는 ADMIN 권한 필요
                         .requestMatchers("/api/admin/**").hasRole("ADMIN")
                         // 나머지 API는 인증된 사용자만 접근 가능
