@@ -3,9 +3,6 @@ package com.danzzan.ticketing.infra.dku;
 import com.danzzan.ticketing.infra.dku.exception.DkuFailedLoginException;
 import com.danzzan.ticketing.infra.dku.model.DkuAuth;
 import lombok.extern.slf4j.Slf4j;
-import org.jsoup.Jsoup;
-import org.jsoup.nodes.Document;
-import org.jsoup.nodes.Element;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -24,14 +21,16 @@ import java.util.List;
 
 // 단국대 포털 인증 서비스
 // 실제 흐름:
-// 1. webinfo.dankook.ac.kr 접속 → SSO 리다이렉트 → 로그인 폼(logon.do?sso=ok) 도착
-// 2. 로그인 폼 action URL로 POST (username, password, tabIndex=0)
-// 3. 302 → SSO 콜백 리다이렉트 따라가기 → 인증 쿠키 획득
+// 1. webinfo.dankook.ac.kr/member/logon.do?sso=ok 로 POST (username, password, tabIndex=0)
+// 2. 302 → pmi-sso.jsp → portal → pmi-sso2.jsp → 리다이렉트 체인 따라가기
+// 3. webinfo 학생정보 페이지 접근하여 세션 쿠키 확보
 @Slf4j
 @Service
 public class DkuAuthenticationService {
 
     private static final String WEBINFO_URL = "https://webinfo.dankook.ac.kr";
+    private static final String LOGIN_URL = WEBINFO_URL + "/member/logon.do?sso=ok";
+    private static final int MAX_REDIRECTS = 10;
     private static final String USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
 
     private final WebClient webClient;
@@ -51,26 +50,17 @@ public class DkuAuthenticationService {
     public DkuAuth login(String studentId, String password) {
         MultiValueMap<String, String> cookies = new LinkedMultiValueMap<>();
 
-        // 0단계: webinfo 접속 → SSO 리다이렉트 따라가서 로그인 폼 도달
-        String loginFormUrl = navigateToLoginForm(cookies);
-        log.info("로그인 폼 URL: {}", loginFormUrl);
+        // 0단계: webinfo 접속하여 초기 쿠키 수집
+        collectInitialCookies(cookies);
 
-        // 1단계: 로그인 폼에 credentials POST
+        // 1단계: webinfo의 logon.do에 직접 POST (SSO 로그인 페이지가 아닌 webinfo로!)
         String formData = makeFormData(studentId, password);
-        ResponseEntity<String> loginResponse = postLogin(loginFormUrl, formData, cookies);
+        ResponseEntity<String> loginResponse = postLogin(LOGIN_URL, formData, cookies);
 
         HttpStatus loginStatus = (HttpStatus) loginResponse.getStatusCode();
         collectCookies(loginResponse.getHeaders(), cookies);
 
         log.info("로그인 POST 응답: {}, Location: {}", loginStatus, loginResponse.getHeaders().getLocation());
-        // 디버그: 로그인 응답 저장
-        try {
-            String debugInfo = "Status: " + loginStatus
-                + "\nLocation: " + loginResponse.getHeaders().getLocation()
-                + "\nCookies: " + cookies
-                + "\nBody:\n" + (loginResponse.getBody() != null ? loginResponse.getBody().substring(0, Math.min(2000, loginResponse.getBody().length())) : "null");
-            java.nio.file.Files.writeString(java.nio.file.Path.of("/tmp/dku_login_response.txt"), debugInfo);
-        } catch (Exception ignored) {}
 
         // 200 OK = 로그인 실패 (로그인 페이지가 다시 렌더링됨)
         if (loginStatus == HttpStatus.OK) {
@@ -79,127 +69,78 @@ public class DkuAuthenticationService {
         }
 
         // 302가 아니면 예상 외 응답
-        if (loginStatus != HttpStatus.FOUND && loginStatus != HttpStatus.MOVED_TEMPORARILY) {
+        if (!isRedirect(loginStatus)) {
             log.error("DKU 로그인 예상 외 응답: {}", loginStatus);
             throw new DkuFailedLoginException();
         }
 
-        // 2단계: SSO 리다이렉트 따라가기 (여러 번일 수 있음)
+        // 2단계: SSO 리다이렉트 체인 따라가기 (pmi-sso.jsp → portal → pmi-sso2.jsp → ...)
         URI location = loginResponse.getHeaders().getLocation();
         if (location == null) {
             log.error("DKU 로그인: Location 헤더 없음");
             throw new DkuFailedLoginException();
         }
 
-        // 리다이렉트 체인 따라가기 (최대 5번)
-        for (int i = 0; i < 5; i++) {
-            log.info("리다이렉트 {}단계: {}", i + 1, location);
-            ResponseEntity<String> redirectResponse = followRedirect(location, cookies);
-            collectCookies(redirectResponse.getHeaders(), cookies);
+        followRedirectChain(location, cookies);
 
-            HttpStatus redirectStatus = (HttpStatus) redirectResponse.getStatusCode();
-            if (redirectStatus == HttpStatus.OK) {
-                // 최종 페이지 도달
-                break;
-            }
-
-            URI nextLocation = redirectResponse.getHeaders().getLocation();
-            if (nextLocation == null) {
-                break;
-            }
-            location = nextLocation;
-        }
-
-        log.info("DKU 로그인 성공. 수집된 쿠키: {}", cookies);
-
-        // 3단계: 로그인 후 webinfo 메인 페이지에 접근하여 세션 쿠키 확보
+        // 3단계: webinfo 학생정보 페이지에 접근하여 세션 확보
         try {
-            ResponseEntity<String> mainResponse = followRedirect(
-                    URI.create(WEBINFO_URL + "/main.do"), cookies);
-            collectCookies(mainResponse.getHeaders(), cookies);
-            HttpStatus mainStatus = (HttpStatus) mainResponse.getStatusCode();
-            log.info("메인 페이지 응답: {}", mainStatus);
-
-            // 메인 페이지도 리다이렉트될 수 있음 (SSO 재인증)
-            if (mainStatus == HttpStatus.FOUND || mainStatus == HttpStatus.MOVED_TEMPORARILY) {
-                URI mainLocation = mainResponse.getHeaders().getLocation();
-                if (mainLocation != null) {
-                    for (int i = 0; i < 5; i++) {
-                        log.info("메인 리다이렉트 {}단계: {}", i + 1, mainLocation);
-                        ResponseEntity<String> r = followRedirect(mainLocation, cookies);
-                        collectCookies(r.getHeaders(), cookies);
-                        HttpStatus s = (HttpStatus) r.getStatusCode();
-                        if (s == HttpStatus.OK) break;
-                        mainLocation = r.getHeaders().getLocation();
-                        if (mainLocation == null) break;
-                    }
-                }
-            }
+            URI studentInfoUri = URI.create(WEBINFO_URL + "/tiac/univ/srec/srlm/views/findScregBasWeb.do?_view=ok");
+            followRedirectChain(studentInfoUri, cookies);
         } catch (Exception e) {
-            log.warn("메인 페이지 접근 실패 (무시): {}", e.getMessage());
+            log.warn("학생정보 페이지 사전 접근 실패 (무시): {}", e.getMessage());
         }
 
-        log.info("최종 쿠키: {}", cookies);
+        log.info("DKU 로그인 완료. 수집된 쿠키 키: {}", cookies.keySet());
         return new DkuAuth(cookies);
     }
 
-    // webinfo 접속 → SSO 리다이렉트 → 로그인 폼 페이지까지 따라가기
-    // 로그인 폼의 action URL 반환
-    private String navigateToLoginForm(MultiValueMap<String, String> cookies) {
+    // webinfo 초기 접속으로 쿠키 수집
+    private void collectInitialCookies(MultiValueMap<String, String> cookies) {
         try {
             URI currentUri = URI.create(WEBINFO_URL + "/");
-
-            // 리다이렉트 체인 따라가기 (최대 5번)
-            String lastBody = null;
-            for (int i = 0; i < 5; i++) {
-                ResponseEntity<String> response = followRedirect(currentUri, cookies);
+            for (int i = 0; i < MAX_REDIRECTS; i++) {
+                ResponseEntity<String> response = doGet(currentUri, cookies);
                 collectCookies(response.getHeaders(), cookies);
 
                 HttpStatus status = (HttpStatus) response.getStatusCode();
-                if (status == HttpStatus.OK) {
-                    lastBody = response.getBody();
-                    break;
-                }
+                if (!isRedirect(status)) break;
 
                 URI nextLocation = response.getHeaders().getLocation();
-                if (nextLocation == null) {
-                    lastBody = response.getBody();
-                    break;
-                }
-
-                // 상대 경로 처리
+                if (nextLocation == null) break;
                 if (!nextLocation.isAbsolute()) {
                     nextLocation = currentUri.resolve(nextLocation);
                 }
                 currentUri = nextLocation;
             }
-
-            // 로그인 폼 HTML에서 action URL 추출
-            if (lastBody != null && !lastBody.isEmpty()) {
-                Document doc = Jsoup.parse(lastBody);
-                Element form = doc.getElementById("logonForm");
-                if (form != null) {
-                    String action = form.attr("action");
-                    if (action != null && !action.isEmpty()) {
-                        // 상대 경로면 절대 경로로 변환
-                        if (action.startsWith("/")) {
-                            return currentUri.getScheme() + "://" + currentUri.getHost()
-                                    + (currentUri.getPort() > 0 ? ":" + currentUri.getPort() : "")
-                                    + action;
-                        }
-                        return action;
-                    }
-                }
-            }
-
-            // form을 못 찾으면 기본 logon.do URL 사용
-            log.warn("로그인 폼을 찾지 못함. 기본 URL 사용");
-            return WEBINFO_URL + "/member/logon.do";
-
         } catch (Exception e) {
-            log.error("로그인 폼 탐색 실패: {}", e.getMessage());
-            return WEBINFO_URL + "/member/logon.do";
+            log.warn("초기 쿠키 수집 중 오류 (무시): {}", e.getMessage());
         }
+    }
+
+    // 리다이렉트 체인 따라가기
+    private void followRedirectChain(URI startLocation, MultiValueMap<String, String> cookies) {
+        URI location = startLocation;
+        for (int i = 0; i < MAX_REDIRECTS; i++) {
+            log.info("리다이렉트 {}단계: {}", i + 1, location);
+            ResponseEntity<String> response = doGet(location, cookies);
+            collectCookies(response.getHeaders(), cookies);
+
+            HttpStatus status = (HttpStatus) response.getStatusCode();
+            if (!isRedirect(status)) break;
+
+            URI nextLocation = response.getHeaders().getLocation();
+            if (nextLocation == null) break;
+            if (!nextLocation.isAbsolute()) {
+                nextLocation = location.resolve(nextLocation);
+            }
+            location = nextLocation;
+        }
+    }
+
+    private boolean isRedirect(HttpStatus status) {
+        return status == HttpStatus.FOUND || status == HttpStatus.MOVED_TEMPORARILY
+                || status == HttpStatus.MOVED_PERMANENTLY || status == HttpStatus.TEMPORARY_REDIRECT;
     }
 
     // 로그인 POST 요청
@@ -222,8 +163,8 @@ public class DkuAuthenticationService {
         }
     }
 
-    // GET 리다이렉트 따라가기
-    private ResponseEntity<String> followRedirect(URI location, MultiValueMap<String, String> cookies) {
+    // GET 요청
+    private ResponseEntity<String> doGet(URI location, MultiValueMap<String, String> cookies) {
         try {
             return webClient.get()
                     .uri(location)
@@ -234,7 +175,7 @@ public class DkuAuthenticationService {
                     .toEntity(String.class)
                     .block();
         } catch (Exception e) {
-            log.error("리다이렉트 요청 실패: {}", e.getMessage());
+            log.error("GET 요청 실패: {}", e.getMessage());
             throw new DkuFailedLoginException();
         }
     }
