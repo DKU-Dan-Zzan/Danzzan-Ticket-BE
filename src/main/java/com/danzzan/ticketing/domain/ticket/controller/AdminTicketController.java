@@ -1,6 +1,8 @@
 package com.danzzan.ticketing.domain.ticket.controller;
 
 import com.danzzan.ticketing.global.model.ApiResponse;
+import com.danzzan.ticketing.domain.ticket.dto.AdminTicketInitRequestDTO;
+import com.danzzan.ticketing.domain.ticket.dto.AdminTicketInitResponseDTO;
 import com.danzzan.ticketing.domain.ticket.dto.IssueTicketRequestDTO;
 import com.danzzan.ticketing.domain.ticket.dto.IssueTicketResponseDTO;
 import com.danzzan.ticketing.domain.ticket.dto.TicketSearchResponseDTO;
@@ -16,11 +18,15 @@ import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.validation.annotation.Validated;
+import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -34,6 +40,22 @@ import org.springframework.web.bind.annotation.RestController;
 public class AdminTicketController {
 
     private final AdminTicketService adminTicketService;
+
+    @PreAuthorize("hasRole('ADMIN')")
+    @PostMapping("/ticket/init")
+    @Operation(
+            summary = "티켓팅 Redis 초기화(계약)",
+            description = "eventId별 선착순 재고/상태 키 초기화 계약 엔드포인트. 실제 로직은 추후 구현"
+    )
+    @SecurityRequirement(name = "bearerAuth")
+    @ApiResponses({
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "501", description = "미구현 (계약 스캐폴딩)")
+    })
+    public ResponseEntity<ApiResponse<AdminTicketInitResponseDTO>> initTicketStock(
+            @Valid @RequestBody AdminTicketInitRequestDTO request
+    ) {
+        throw new ResponseStatusException(HttpStatus.NOT_IMPLEMENTED, "TODO: ticket init logic");
+    }
 
     @PreAuthorize("hasRole('ADMIN')")
     @GetMapping("/events/{eventId}/tickets/search")

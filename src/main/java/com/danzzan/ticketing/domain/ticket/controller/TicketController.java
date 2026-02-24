@@ -3,12 +3,19 @@ package com.danzzan.ticketing.domain.ticket.controller;
 import com.danzzan.ticketing.domain.ticket.dto.ResponseMyTicketListDto;
 import com.danzzan.ticketing.domain.ticket.dto.ResponseReserveTicketDto;
 import com.danzzan.ticketing.domain.ticket.dto.ResponseTicketEventListDto;
+import com.danzzan.ticketing.domain.ticket.dto.TicketRequestRequestDTO;
+import com.danzzan.ticketing.domain.ticket.dto.TicketRequestResponseDTO;
+import com.danzzan.ticketing.domain.ticket.dto.TicketStatusRequestDTO;
+import com.danzzan.ticketing.domain.ticket.dto.TicketStatusResponseDTO;
 import com.danzzan.ticketing.domain.ticket.service.TicketService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
+import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
@@ -42,5 +49,21 @@ public class TicketController {
         Long userId = (Long) authentication.getPrincipal();
         ResponseMyTicketListDto response = ticketService.getMyTickets(userId);
         return ResponseEntity.ok(response);
+    }
+
+    @PostMapping("/request")
+    @Operation(summary = "티켓 요청(계약)", description = "선착순 티켓 요청 계약 엔드포인트. 실제 로직은 추후 구현")
+    public ResponseEntity<TicketRequestResponseDTO> requestTicket(
+            @Valid @RequestBody TicketRequestRequestDTO request
+    ) {
+        throw new ResponseStatusException(HttpStatus.NOT_IMPLEMENTED, "TODO: ticket request logic");
+    }
+
+    @GetMapping("/status")
+    @Operation(summary = "티켓 상태 조회(계약)", description = "폴링 대비 상태 조회 계약 엔드포인트. 실제 로직은 추후 구현")
+    public ResponseEntity<TicketStatusResponseDTO> getTicketStatus(
+            @Valid @ModelAttribute TicketStatusRequestDTO request
+    ) {
+        throw new ResponseStatusException(HttpStatus.NOT_IMPLEMENTED, "TODO: ticket status logic");
     }
 }
