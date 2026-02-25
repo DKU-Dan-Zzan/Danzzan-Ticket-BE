@@ -7,7 +7,11 @@ import com.danzzan.ticketing.domain.ticket.dto.TicketRequestRequestDTO;
 import com.danzzan.ticketing.domain.ticket.dto.TicketRequestResponseDTO;
 import com.danzzan.ticketing.domain.ticket.dto.TicketStatusRequestDTO;
 import com.danzzan.ticketing.domain.ticket.dto.TicketStatusResponseDTO;
+import com.danzzan.ticketing.domain.ticket.redis.TicketRequestStatus;
+import com.danzzan.ticketing.domain.ticket.service.AdmissionService;
+import com.danzzan.ticketing.domain.ticket.service.ClaimService;
 import com.danzzan.ticketing.domain.ticket.service.TicketService;
+import com.danzzan.ticketing.domain.ticket.service.model.ClaimResult;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
@@ -25,6 +29,8 @@ import org.springframework.web.bind.annotation.*;
 public class TicketController {
 
     private final TicketService ticketService;
+    private final AdmissionService admissionService;
+    private final ClaimService claimService;
 
     @GetMapping("/events")
     @Operation(summary = "이벤트 목록 조회", description = "티켓팅 가능한 공연 목록을 조회합니다. 로그인 불필요.")
@@ -56,7 +62,19 @@ public class TicketController {
     public ResponseEntity<TicketRequestResponseDTO> requestTicket(
             @Valid @RequestBody TicketRequestRequestDTO request
     ) {
-        throw new ResponseStatusException(HttpStatus.NOT_IMPLEMENTED, "TODO: ticket request logic");
+        TicketRequestStatus admissionStatus = admissionService.admit(request.getEventId(), request.getUserId());
+        if (admissionStatus != TicketRequestStatus.ADMITTED) {
+            return ResponseEntity.ok(TicketRequestResponseDTO.builder()
+                    .status(admissionStatus)
+                    .remaining(null)
+                    .build());
+        }
+
+        ClaimResult claimResult = claimService.claim(request.getEventId(), request.getUserId());
+        return ResponseEntity.ok(TicketRequestResponseDTO.builder()
+                .status(claimResult.status())
+                .remaining(claimResult.remaining())
+                .build());
     }
 
     @GetMapping("/status")
