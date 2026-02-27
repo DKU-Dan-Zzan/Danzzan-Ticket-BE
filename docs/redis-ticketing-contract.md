@@ -37,6 +37,12 @@
   "stock": 5000
 }
 ```
+- Operational rule:
+  - `stock` is rewritten for the event.
+  - Existing claim artifacts are cleaned before open:
+    - `ticket:{eventId}:user:*`
+    - `ticket:{eventId}:status:*`
+  - Cleanup uses `SCAN + UNLINK` (no `KEYS`).
 - Response (contract)
 ```json
 {
@@ -108,6 +114,9 @@
   - API response rule remains unchanged:
     - `SUCCESS` uses `remaining`.
     - `SOLD_OUT|ALREADY` must return `remaining: null`.
+- Claim observability:
+  - `ClaimService` logs each outcome as `claim_v2 outcome` with `eventId`, `userId`, `status`, `remaining`, `total`.
+  - `total` is an in-memory per-status counter (`SUCCESS|SOLD_OUT|ALREADY`) for runtime visibility.
 - Queue extension rule:
   - When queue admission is introduced, replace `AdmissionService` only.
   - Reuse `ClaimService` interface without signature changes.
@@ -115,7 +124,7 @@
   - `errorCode` is reserved for future extension and intentionally not included in current response schema.
 
 ## Implementation Note
-- `POST /api/admin/ticket/init`: implemented (writes `stockKey`).
+- `POST /api/admin/ticket/init`: implemented (stock rewrite + claim key cleanup via scan/unlink).
 - `POST /tickets/request`: implemented (`admit -> claim`) with Lua v2 atomic claim.
 - `GET /tickets/status`: implemented (status read, missing key => `NONE`).
 - Claim status persistence (`SUCCESS|SOLD_OUT|ALREADY`) is unified inside Lua.
