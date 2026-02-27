@@ -41,3 +41,11 @@ out/
 
 ### VS Code ###
 .vscode/
+
+### Loadtest artifacts ###
+# Keep scripts/docs/report templates in git, but ignore generated runtime outputs.
+reports/loadtest/raw/
+reports/loadtest/**/*.tmp
+reports/loadtest/**/*.log
+reports/loadtest/**/*.csv
+reports/loadtest/**/*.json
