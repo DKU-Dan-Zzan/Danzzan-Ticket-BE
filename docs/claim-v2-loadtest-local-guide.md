@@ -51,6 +51,23 @@ SPRING_PROFILES_ACTIVE=local-compose ./gradlew bootRun
   - `studentId=1234`, `password=1234`
 
 ## 3) 실행 순서
+### A. 원클릭 실행(권장)
+```bash
+scripts/run_claim_v2_e2e.sh \
+  --base-url http://localhost:8080 \
+  --event-id festival-day1 \
+  --stock 1000 \
+  --users 1500 \
+  --concurrency 1500 \
+  --max-p95-ms 2000
+```
+
+이 스크립트는 다음을 순차 수행한다.
+- `/user/login`으로 관리자 토큰 발급
+- `POST /api/admin/ticket/init` 호출 포함 부하 실행
+- 집계/판정(`--strict`) 및 리포트 생성
+
+### B. 수동 실행(세부 확인용)
 1. 관리자 토큰 발급
 ```bash
 ADMIN_TOKEN="$(curl -s -X POST http://localhost:8080/user/login \
@@ -112,3 +129,23 @@ scripts/aggregate_ticket_claim_results.sh \
 - `reports/loadtest/raw/*` 원시 산출물은 `.gitignore` 대상이다.
 - `reports/loadtest/*.md` 리포트는 필요 시 커밋 가능하다.
 - 기준 미달(`FAIL`) 시 원인 메모를 리포트에 남기고, 기능 코드 수정은 별도 브랜치에서 진행한다.
+
+## 7) 리포트 정리 규칙
+- 기준 리포트는 `reports/loadtest/`의 **최신 PASS 1건**이다.
+- FAIL 리포트는 `reports/loadtest/archive/`로 이동해 이력만 보관한다.
+- PASS 히스토리를 줄이고 싶으면 최신 PASS를 제외한 PASS도 archive로 이동할 수 있다.
+
+정리 스크립트:
+```bash
+# FAIL만 archive 이동
+scripts/organize_loadtest_reports.sh
+
+# FAIL + 오래된 PASS도 archive 이동(최신 PASS만 유지)
+scripts/organize_loadtest_reports.sh --archive-old-pass
+```
+
+## 8) 집계 스크립트 회귀 테스트
+`aggregate_ticket_claim_results.sh`의 PASS/FAIL 판단 회귀를 셸 테스트로 검증한다.
+```bash
+scripts/tests/test_aggregate_ticket_claim_results.sh
+```
