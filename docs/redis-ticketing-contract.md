@@ -1,8 +1,8 @@
-# Redis Ticketing Contract (Queue-Ready)
+# Redis Ticketing Contract (Queue-Ready, Claim v2)
 
 ## Scope
-- This document defines Redis key naming and v1 API behavior.
-- Queue admission and Lua-based atomic claim are out of scope in this sprint.
+- This document defines Redis key naming and request API behavior with Claim v2.
+- Queue admission extension is out of scope in this sprint.
 
 ## Key Naming
 - Prefix: `ticket:{eventId}:...`
@@ -95,11 +95,19 @@
   - `admit` first.
   - If admission status is not `ADMITTED`, do not call claim and return that status as-is.
   - Only when `ADMITTED`, call claim and return `ClaimResult`.
-- Claim v1 behavior:
-  - First-claim check via `SETNX(userKey)`.
-  - Stock decrement via `DECR(stockKey)`.
-  - Negative/invalid stock paths return `SOLD_OUT`.
-  - v1 is not Lua-atomic across all steps.
+- Claim v2 behavior (Lua atomic):
+  - A single Lua script performs claim decision, stock mutation, user marker write, and status write atomically.
+  - Decision order is fixed:
+    - If `userKey` already exists -> `ALREADY`
+    - Else if `stock <= 0` (or stock key missing/invalid) -> `SOLD_OUT`
+    - Else `DECR(stockKey)` + `SET(userKey)` + `SET(statusKey=SUCCESS)` -> `SUCCESS`
+  - Script return payload is fixed to `[code, remaining]`.
+    - `code=1` -> `ALREADY`
+    - `code=2` -> `SOLD_OUT`
+    - `code=3` -> `SUCCESS`
+  - API response rule remains unchanged:
+    - `SUCCESS` uses `remaining`.
+    - `SOLD_OUT|ALREADY` must return `remaining: null`.
 - Queue extension rule:
   - When queue admission is introduced, replace `AdmissionService` only.
   - Reuse `ClaimService` interface without signature changes.
@@ -108,6 +116,6 @@
 
 ## Implementation Note
 - `POST /api/admin/ticket/init`: implemented (writes `stockKey`).
-- `POST /tickets/request`: implemented (`admit -> claim`).
+- `POST /tickets/request`: implemented (`admit -> claim`) with Lua v2 atomic claim.
 - `GET /tickets/status`: implemented (status read, missing key => `NONE`).
-- Lua atomic claim migration is scheduled for v2.
+- Claim status persistence (`SUCCESS|SOLD_OUT|ALREADY`) is unified inside Lua.
