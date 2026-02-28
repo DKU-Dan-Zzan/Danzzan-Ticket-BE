@@ -102,6 +102,20 @@ public class GlobalExceptionHandler {
                 .body(Map.of("error", e.getMessage()));
     }
 
+    // 티켓팅: 더블클릭 방지
+    @ExceptionHandler(DoubleClickException.class)
+    public ResponseEntity<Map<String, String>> handleDoubleClick(DoubleClickException e) {
+        return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
+                .body(Map.of("error", e.getMessage()));
+    }
+
+    // Redis 장애
+    @ExceptionHandler(RedisUnavailableException.class)
+    public ResponseEntity<Map<String, String>> handleRedisUnavailable(RedisUnavailableException e) {
+        return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
+                .body(Map.of("error", e.getMessage()));
+    }
+
     @ExceptionHandler(AdminAuthenticationException.class)
     public ResponseEntity<ApiResponse<Void>> handleAdminAuthentication(AdminAuthenticationException e) {
         return ResponseEntity.status(HttpStatus.UNAUTHORIZED)

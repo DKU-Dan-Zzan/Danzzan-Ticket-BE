@@ -6,25 +6,30 @@ import com.danzzan.ticketing.domain.event.repository.FestivalEventRepository;
 import com.danzzan.ticketing.domain.event.exception.EventNotFoundException;
 import com.danzzan.ticketing.domain.ticket.dto.*;
 import com.danzzan.ticketing.domain.ticket.exception.AlreadyReservedException;
+import com.danzzan.ticketing.domain.ticket.exception.DoubleClickException;
 import com.danzzan.ticketing.domain.ticket.exception.EventNotOpenException;
 import com.danzzan.ticketing.domain.ticket.exception.EventSoldOutException;
 import com.danzzan.ticketing.domain.ticket.model.entity.TicketStatus;
 import com.danzzan.ticketing.domain.ticket.model.entity.UserTicket;
+import com.danzzan.ticketing.domain.ticket.repository.TicketRedisRepository;
 import com.danzzan.ticketing.domain.ticket.repository.UserTicketRepository;
 import com.danzzan.ticketing.domain.user.model.entity.User;
 import com.danzzan.ticketing.domain.user.repository.UserRepository;
 import com.danzzan.ticketing.domain.user.exception.UserNotFoundException;
+import com.danzzan.ticketing.global.exception.RedisUnavailableException;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.data.redis.RedisConnectionFailureException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
-import java.util.Locale;
 import java.util.stream.Collectors;
 
+@Slf4j
 @Service
 @Transactional(readOnly = true)
 @RequiredArgsConstructor
@@ -33,6 +38,7 @@ public class TicketService {
     private final FestivalEventRepository eventRepository;
     private final UserTicketRepository ticketRepository;
     private final UserRepository userRepository;
+    private final TicketRedisRepository ticketRedisRepository;
 
     // 이벤트 목록 조회 (로그인 불필요)
     public ResponseTicketEventListDto getTicketingEvents() {
@@ -45,56 +51,74 @@ public class TicketService {
         return new ResponseTicketEventListDto(items);
     }
 
-    // 티켓 예매 (로그인 필요)
+    // 티켓 예매 (로그인 필요) — Redis Lua 기반
     @Transactional
     public ResponseReserveTicketDto reserveTicket(Long userId, Long eventId) {
-        // 1. 이벤트 조회
-        FestivalEvent event = eventRepository.findById(eventId)
-                .orElseThrow(EventNotFoundException::new);
+        // 1. Redis Lua Script로 원자적 예매 시도
+        long luaResult;
+        try {
+            luaResult = ticketRedisRepository.tryReserve(eventId, userId);
+        } catch (RedisConnectionFailureException e) {
+            log.error("Redis 연결 실패: eventId={}, userId={}", eventId, userId, e);
+            throw new RedisUnavailableException();
+        }
 
-        // 2. 오픈 전 체크 (FE에서도 막지만 BE 방어)
-        if (event.getTicketingStatus() == TicketingStatus.READY) {
+        // 2. Lua 결과 처리
+        if (luaResult == -1) {
             throw new EventNotOpenException();
         }
-
-        // 3. 마감 체크 (FE에서도 막지만 BE 방어)
-        if (event.getTicketingStatus() == TicketingStatus.CLOSED) {
+        if (luaResult == -2) {
+            throw new DoubleClickException();
+        }
+        if (luaResult == -3) {
             throw new EventSoldOutException();
         }
 
-        // 4. 중복 예매 체크
-        if (ticketRepository.existsByUserIdAndEventId(userId, eventId)) {
-            throw new AlreadyReservedException();
-        }
-
-        // 5. 잔여석 체크
-        long currentCount = ticketRepository.countByEventId(eventId);
-        if (currentCount >= event.getTotalCapacity()) {
-            throw new EventSoldOutException();
-        }
-
-        // 6. 유저 조회
-        User user = userRepository.findById(userId)
-                .orElseThrow(UserNotFoundException::new);
-
-        // 7. 순번 계산 + 티켓 생성
-        int order = (int) currentCount + 1;
-        UserTicket ticket = UserTicket.builder()
-                .user(user)
-                .event(event)
-                .ticketingOrder(order)
-                .build();
-
-        // 8. DB 저장 (동시 요청 시 unique 제약 위반 가능)
+        // 3. Redis 차감 성공 → DB INSERT
         try {
-            ticketRepository.save(ticket);
-        } catch (DataIntegrityViolationException e) {
-            throw new AlreadyReservedException("이미 예매 처리가 완료되었습니다. 내 티켓에서 확인해주세요.");
-        }
+            FestivalEvent event = eventRepository.findById(eventId)
+                    .orElseThrow(EventNotFoundException::new);
 
-        // 9. 응답 생성
-        ResponseMyTicketDto ticketDto = toMyTicketDto(ticket, event);
-        return new ResponseReserveTicketDto(order, ticketDto);
+            User user = userRepository.findById(userId)
+                    .orElseThrow(UserNotFoundException::new);
+
+            // 순번 계산
+            long currentCount = ticketRepository.countByEventId(eventId);
+            int order = (int) currentCount + 1;
+
+            UserTicket ticket = UserTicket.builder()
+                    .user(user)
+                    .event(event)
+                    .ticketingOrder(order)
+                    .build();
+
+            try {
+                ticketRepository.save(ticket);
+            } catch (DataIntegrityViolationException e) {
+                // UNIQUE 제약 위반 → Redis 복원
+                ticketRedisRepository.restoreOne(eventId);
+                throw new AlreadyReservedException("이미 예매 처리가 완료되었습니다. 내 티켓에서 확인해주세요.");
+            }
+
+            // 4. newRemaining == 0 → 자동 매진 처리
+            if (luaResult == 0) {
+                event.changeStatus(TicketingStatus.CLOSED);
+                eventRepository.save(event);
+                ticketRedisRepository.closeEvent(eventId);
+                log.info("이벤트 자동 매진 처리: eventId={}", eventId);
+            }
+
+            ResponseMyTicketDto ticketDto = toMyTicketDto(ticket, event);
+            return new ResponseReserveTicketDto(order, ticketDto);
+
+        } catch (AlreadyReservedException | EventNotFoundException | UserNotFoundException e) {
+            throw e;
+        } catch (Exception e) {
+            // DB 실패 시 Redis 복원
+            ticketRedisRepository.restoreOne(eventId);
+            log.error("DB 저장 실패, Redis 복원: eventId={}, userId={}", eventId, userId, e);
+            throw e;
+        }
     }
 
     // 내 티켓 목록 조회 (로그인 필요)
@@ -108,11 +132,48 @@ public class TicketService {
         return new ResponseMyTicketListDto(items);
     }
 
+    // 잔여석 조회 (폴링용) — Redis에서 직접 읽기
+    public int getRemaining(Long eventId) {
+        try {
+            Integer remaining = ticketRedisRepository.getRemaining(eventId);
+            if (remaining != null) {
+                return remaining;
+            }
+        } catch (RedisConnectionFailureException e) {
+            log.error("Redis 연결 실패 (잔여석 조회): eventId={}", eventId, e);
+            throw new RedisUnavailableException();
+        }
+
+        // Redis에 키가 없으면 DB 폴백
+        FestivalEvent event = eventRepository.findById(eventId)
+                .orElseThrow(EventNotFoundException::new);
+        long ticketCount = ticketRepository.countByEventId(eventId);
+        return Math.max(0, event.getTotalCapacity() - (int) ticketCount);
+    }
+
     // ===== 변환 메서드 =====
 
     private ResponseTicketEventDto toTicketEventDto(FestivalEvent event) {
-        long ticketCount = ticketRepository.countByEventId(event.getId());
-        int remaining = Math.max(0, event.getTotalCapacity() - (int) ticketCount);
+        int remaining;
+
+        // OPEN 상태인 이벤트는 Redis에서 잔여석 읽기
+        if (event.getTicketingStatus() == TicketingStatus.OPEN) {
+            try {
+                Integer redisRemaining = ticketRedisRepository.getRemaining(event.getId());
+                if (redisRemaining != null) {
+                    remaining = redisRemaining;
+                } else {
+                    long ticketCount = ticketRepository.countByEventId(event.getId());
+                    remaining = Math.max(0, event.getTotalCapacity() - (int) ticketCount);
+                }
+            } catch (RedisConnectionFailureException e) {
+                long ticketCount = ticketRepository.countByEventId(event.getId());
+                remaining = Math.max(0, event.getTotalCapacity() - (int) ticketCount);
+            }
+        } else {
+            long ticketCount = ticketRepository.countByEventId(event.getId());
+            remaining = Math.max(0, event.getTotalCapacity() - (int) ticketCount);
+        }
 
         // BE status → FE status 변환
         String feStatus;
