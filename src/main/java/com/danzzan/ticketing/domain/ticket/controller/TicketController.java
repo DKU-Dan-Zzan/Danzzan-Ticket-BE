@@ -1,6 +1,7 @@
 package com.danzzan.ticketing.domain.ticket.controller;
 
 import com.danzzan.ticketing.domain.ticket.dto.ResponseMyTicketListDto;
+import com.danzzan.ticketing.domain.ticket.dto.ResponseRemainingDto;
 import com.danzzan.ticketing.domain.ticket.dto.ResponseReserveTicketDto;
 import com.danzzan.ticketing.domain.ticket.dto.ResponseTicketEventListDto;
 import com.danzzan.ticketing.domain.ticket.service.TicketService;
@@ -34,6 +35,13 @@ public class TicketController {
         Long userId = (Long) authentication.getPrincipal();
         ResponseReserveTicketDto response = ticketService.reserveTicket(userId, eventId);
         return ResponseEntity.ok(response);
+    }
+
+    @GetMapping("/events/{eventId}/remaining")
+    @Operation(summary = "잔여석 조회 (폴링용)", description = "Redis에서 실시간 잔여석을 조회합니다. 로그인 불필요.")
+    public ResponseEntity<ResponseRemainingDto> getRemaining(@PathVariable Long eventId) {
+        int remaining = ticketService.getRemaining(eventId);
+        return ResponseEntity.ok(new ResponseRemainingDto(eventId, remaining));
     }
 
     @GetMapping("/me")
