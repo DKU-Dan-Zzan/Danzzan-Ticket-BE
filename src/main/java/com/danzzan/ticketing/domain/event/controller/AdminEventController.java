@@ -17,6 +17,7 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -124,5 +125,23 @@ public class AdminEventController {
     })
     public ApiResponse<EventStatsResponseDTO> getEventStats(@NotNull @PathVariable Long eventId) {
         return ApiResponse.success(adminEventService.getEventStats(eventId));
+    }
+
+    @PreAuthorize("hasRole('ADMIN')")
+    @PostMapping("/events/{eventId}/open")
+    @Operation(summary = "티켓팅 오픈", description = "READY 상태의 이벤트를 OPEN으로 전환하고 Redis에 잔여수량을 세팅합니다.")
+    @SecurityRequirement(name = "bearerAuth")
+    public ApiResponse<Void> openEvent(@NotNull @PathVariable Long eventId) {
+        adminEventService.openEvent(eventId);
+        return ApiResponse.success(null);
+    }
+
+    @PreAuthorize("hasRole('ADMIN')")
+    @PostMapping("/events/{eventId}/close")
+    @Operation(summary = "티켓팅 마감", description = "OPEN 상태의 이벤트를 CLOSED로 전환합니다.")
+    @SecurityRequirement(name = "bearerAuth")
+    public ApiResponse<Void> closeEvent(@NotNull @PathVariable Long eventId) {
+        adminEventService.closeEvent(eventId);
+        return ApiResponse.success(null);
     }
 }
