@@ -11,16 +11,17 @@ import com.danzzan.ticketing.domain.ticket.redis.TicketRequestStatus;
 import com.danzzan.ticketing.domain.ticket.service.AdmissionService;
 import com.danzzan.ticketing.domain.ticket.service.ClaimService;
 import com.danzzan.ticketing.domain.ticket.service.TicketService;
+import com.danzzan.ticketing.domain.ticket.service.TicketStatusService;
 import com.danzzan.ticketing.domain.ticket.service.model.ClaimResult;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
-import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.bind.annotation.*;
+
+import java.util.Set;
 
 @RestController
 @RequestMapping("/tickets")
@@ -28,9 +29,16 @@ import org.springframework.web.bind.annotation.*;
 @Tag(name = "사용자 티켓팅", description = "공연 티켓 예매 및 조회 API")
 public class TicketController {
 
+    private static final Set<TicketRequestStatus> CLAIM_TERMINAL_STATUSES = Set.of(
+            TicketRequestStatus.SUCCESS,
+            TicketRequestStatus.SOLD_OUT,
+            TicketRequestStatus.ALREADY
+    );
+
     private final TicketService ticketService;
     private final AdmissionService admissionService;
     private final ClaimService claimService;
+    private final TicketStatusService ticketStatusService;
 
     @GetMapping("/events")
     @Operation(summary = "이벤트 목록 조회", description = "티켓팅 가능한 공연 목록을 조회합니다. 로그인 불필요.")
@@ -58,7 +66,7 @@ public class TicketController {
     }
 
     @PostMapping("/request")
-    @Operation(summary = "티켓 요청(계약)", description = "선착순 티켓 요청 계약 엔드포인트. 실제 로직은 추후 구현")
+    @Operation(summary = "티켓 요청(v1)", description = "Admission 통과 시 Claim을 수행해 SUCCESS/SOLD_OUT/ALREADY를 반환합니다.")
     public ResponseEntity<TicketRequestResponseDTO> requestTicket(
             @Valid @RequestBody TicketRequestRequestDTO request
     ) {
@@ -71,6 +79,10 @@ public class TicketController {
         }
 
         ClaimResult claimResult = claimService.claim(request.getEventId(), request.getUserId());
+        if (!CLAIM_TERMINAL_STATUSES.contains(claimResult.status())) {
+            throw new IllegalStateException("claim status must be one of SUCCESS, SOLD_OUT, ALREADY");
+        }
+
         return ResponseEntity.ok(TicketRequestResponseDTO.builder()
                 .status(claimResult.status())
                 .remaining(claimResult.remaining())
@@ -78,10 +90,13 @@ public class TicketController {
     }
 
     @GetMapping("/status")
-    @Operation(summary = "티켓 상태 조회(계약)", description = "폴링 대비 상태 조회 계약 엔드포인트. 실제 로직은 추후 구현")
+    @Operation(summary = "티켓 상태 조회(v1)", description = "status key를 조회하고 없으면 NONE을 반환합니다.")
     public ResponseEntity<TicketStatusResponseDTO> getTicketStatus(
             @Valid @ModelAttribute TicketStatusRequestDTO request
     ) {
-        throw new ResponseStatusException(HttpStatus.NOT_IMPLEMENTED, "TODO: ticket status logic");
+        TicketRequestStatus status = ticketStatusService.getStatus(request.getEventId(), request.getUserId());
+        return ResponseEntity.ok(TicketStatusResponseDTO.builder()
+                .status(status)
+                .build());
     }
 }

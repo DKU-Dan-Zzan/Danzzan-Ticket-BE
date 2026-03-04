@@ -1,8 +1,8 @@
 # Redis Ticketing Contract (Queue-Ready)
 
 ## Scope
-- This document defines only Redis key naming and API contract scaffolding.
-- Real issue logic (`DECR`, `SETNX`, Lua script, queue admission) is out of scope in this sprint.
+- This document defines Redis key naming and v1 API behavior.
+- Queue admission and Lua-based atomic claim are out of scope in this sprint.
 
 ## Key Naming
 - Prefix: `ticket:{eventId}:...`
@@ -16,7 +16,7 @@
 ### Keys used in this sprint
 - `stock`: `ticket:{eventId}:stock` (INT)
 - `user`: `ticket:{eventId}:user:{userId}` (STRING/INT)
-- `status`: `ticket:{eventId}:status:{userId}` (STRING: `SUCCESS|SOLD_OUT|ALREADY|WAITING|ADMITTED`)
+- `status`: `ticket:{eventId}:status:{userId}` (STRING: `WAITING|ADMITTED|SUCCESS|SOLD_OUT|ALREADY`)
 
 ### Reserved keys for queue extension
 - `queue`: `ticket:{eventId}:queue` (ZSET)
@@ -61,15 +61,20 @@
   "remaining": 42
 }
 ```
+- Response status cases
+  - `SUCCESS` with `remaining` value
+  - `SOLD_OUT` with `remaining: null`
+  - `ALREADY` with `remaining: null`
 
 ### 3) 상태 조회 (polling)
 - `GET /tickets/status?eventId=festival-day1&userId=32221902`
 - Response (contract)
 ```json
 {
-  "status": "WAITING"
+  "status": "NONE"
 }
 ```
+- If status key does not exist, return `NONE`.
 
 ### Status enum
 - `NONE`, `WAITING`, `ADMITTED`, `SUCCESS`, `SOLD_OUT`, `ALREADY`
@@ -90,6 +95,11 @@
   - `admit` first.
   - If admission status is not `ADMITTED`, do not call claim and return that status as-is.
   - Only when `ADMITTED`, call claim and return `ClaimResult`.
+- Claim v1 behavior:
+  - First-claim check via `SETNX(userKey)`.
+  - Stock decrement via `DECR(stockKey)`.
+  - Negative/invalid stock paths return `SOLD_OUT`.
+  - v1 is not Lua-atomic across all steps.
 - Queue extension rule:
   - When queue admission is introduced, replace `AdmissionService` only.
   - Reuse `ClaimService` interface without signature changes.
@@ -97,5 +107,7 @@
   - `errorCode` is reserved for future extension and intentionally not included in current response schema.
 
 ## Implementation Note
-- `POST /tickets/request` is wired to `admit -> claim` service boundary (stub stage).
-- `POST /api/admin/ticket/init` and `GET /tickets/status` remain scaffold endpoints (`501`) at this stage.
+- `POST /api/admin/ticket/init`: implemented (writes `stockKey`).
+- `POST /tickets/request`: implemented (`admit -> claim`).
+- `GET /tickets/status`: implemented (status read, missing key => `NONE`).
+- Lua atomic claim migration is scheduled for v2.
