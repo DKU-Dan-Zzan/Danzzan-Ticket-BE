@@ -2,7 +2,7 @@
 
 ## Scope
 - This document defines Redis key naming and request API behavior with Claim v2.
-- Queue admission extension is out of scope in this sprint.
+- Queue admission route reorganization is included.
 
 ## Key Naming
 - Prefix: `ticket:{eventId}:...`
@@ -51,7 +51,52 @@
 }
 ```
 
-### 2) 티켓 요청(선착순)
+### 2) 대기열 진입(선착순)
+- `POST /tickets/{eventId}/queue/enter`
+- Authentication required.
+- `userId` is resolved from authenticated principal and converted to string.
+- Request body is not required.
+- Route compatibility:
+  - Legacy `POST /tickets/request` is preserved as an alias.
+  - Legacy route returns deprecation headers (`Deprecation`, `Sunset`).
+
+- Request/Response contract (effective internal contract)
+- Internal request shape
+```json
+{
+  "eventId": "festival-day1",
+  "userId": "32221902"
+}
+```
+- Response
+```json
+{
+  "status": "SUCCESS",
+  "remaining": 42
+}
+```
+- Response status cases
+  - `WAITING|ADMITTED` (admission-only states)
+  - `SUCCESS` with `remaining` value
+  - `SOLD_OUT` with `remaining: null`
+  - `ALREADY` with `remaining: null`
+
+### 3) 대기열 상태 조회 (polling)
+- `GET /tickets/{eventId}/queue/status`
+- Authentication required.
+- `userId` is resolved from authenticated principal and converted to string.
+- Route compatibility:
+  - Legacy `GET /tickets/status?eventId=...&userId=...` is preserved as an alias.
+  - Legacy route returns deprecation headers (`Deprecation`, `Sunset`).
+- Response
+```json
+{
+  "status": "NONE"
+}
+```
+- If status key does not exist, return `NONE`.
+
+### 4) 레거시 호환 요청(Deprecated)
 - `POST /tickets/request`
 - Request
 ```json
@@ -60,27 +105,9 @@
   "userId": "32221902"
 }
 ```
-- Response (contract)
-```json
-{
-  "status": "SUCCESS",
-  "remaining": 42
-}
-```
-- Response status cases
-  - `SUCCESS` with `remaining` value
-  - `SOLD_OUT` with `remaining: null`
-  - `ALREADY` with `remaining: null`
-
-### 3) 상태 조회 (polling)
-- `GET /tickets/status?eventId=festival-day1&userId=32221902`
-- Response (contract)
-```json
-{
-  "status": "NONE"
-}
-```
-- If status key does not exist, return `NONE`.
+- Behavior:
+  - Internally same flow as `/tickets/{eventId}/queue/enter`
+  - Returns deprecation headers.
 
 ### Status enum
 - `NONE`, `WAITING`, `ADMITTED`, `SUCCESS`, `SOLD_OUT`, `ALREADY`
@@ -125,6 +152,8 @@
 
 ## Implementation Note
 - `POST /api/admin/ticket/init`: implemented (stock rewrite + claim key cleanup via scan/unlink).
-- `POST /tickets/request`: implemented (`admit -> claim`) with Lua v2 atomic claim.
-- `GET /tickets/status`: implemented (status read, missing key => `NONE`).
+- `POST /tickets/{eventId}/queue/enter`: implemented (`admit -> claim`) with Lua v2 atomic claim.
+- `GET /tickets/{eventId}/queue/status`: implemented (status read, missing key => `NONE`).
+- `POST /tickets/request`: implemented as deprecated alias to queue enter flow.
+- `GET /tickets/status`: implemented as deprecated alias to queue status flow.
 - Claim status persistence (`SUCCESS|SOLD_OUT|ALREADY`) is unified inside Lua.

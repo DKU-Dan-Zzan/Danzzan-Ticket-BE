@@ -48,8 +48,9 @@ public class TicketService {
     // 티켓 예매 (로그인 필요)
     @Transactional
     public ResponseReserveTicketDto reserveTicket(Long userId, Long eventId) {
-        // 1. 이벤트 조회
-        FestivalEvent event = eventRepository.findById(eventId)
+        // 1. 이벤트 행 잠금 조회
+        // 동일 eventId 예매 경쟁을 직렬화해 count-check/insert 레이스를 방지한다.
+        FestivalEvent event = eventRepository.findByIdForUpdate(eventId)
                 .orElseThrow(EventNotFoundException::new);
 
         // 2. 오픈 전 체크 (FE에서도 막지만 BE 방어)

@@ -16,8 +16,10 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -56,6 +58,8 @@ class TicketControllerFlowTest {
         assertThat(response.getBody()).isNotNull();
         assertThat(response.getBody().getStatus()).isEqualTo(TicketRequestStatus.WAITING);
         assertThat(response.getBody().getRemaining()).isNull();
+        assertThat(response.getHeaders().getFirst("Deprecation")).isEqualTo("true");
+        assertThat(response.getHeaders().getFirst("Sunset")).isNotBlank();
         verify(claimService, never()).claim("festival-day1", "32221902");
     }
 
@@ -94,5 +98,40 @@ class TicketControllerFlowTest {
         assertThat(response.getStatusCode().is2xxSuccessful()).isTrue();
         assertThat(response.getBody()).isNotNull();
         assertThat(response.getBody().getStatus()).isEqualTo(TicketRequestStatus.NONE);
+        assertThat(response.getHeaders().getFirst("Deprecation")).isEqualTo("true");
+        assertThat(response.getHeaders().getFirst("Sunset")).isNotBlank();
+    }
+
+    @Test
+    void queueEnterUsesAuthenticatedUserId() {
+        Authentication authentication = mock(Authentication.class);
+        when(authentication.getPrincipal()).thenReturn(77L);
+        when(admissionService.admit("5", "77")).thenReturn(TicketRequestStatus.ADMITTED);
+        when(claimService.claim("5", "77")).thenReturn(ClaimResult.success(99L));
+
+        ResponseEntity<TicketRequestResponseDTO> response = ticketController.enterQueue(5L, authentication);
+
+        assertThat(response.getStatusCode().is2xxSuccessful()).isTrue();
+        assertThat(response.getBody()).isNotNull();
+        assertThat(response.getBody().getStatus()).isEqualTo(TicketRequestStatus.SUCCESS);
+        assertThat(response.getBody().getRemaining()).isEqualTo(99L);
+        assertThat(response.getHeaders().getFirst("Deprecation")).isNull();
+        verify(admissionService).admit("5", "77");
+        verify(claimService).claim("5", "77");
+    }
+
+    @Test
+    void queueStatusUsesAuthenticatedUserId() {
+        Authentication authentication = mock(Authentication.class);
+        when(authentication.getPrincipal()).thenReturn(77L);
+        when(ticketStatusService.getStatus("5", "77")).thenReturn(TicketRequestStatus.WAITING);
+
+        ResponseEntity<TicketStatusResponseDTO> response = ticketController.getQueueStatus(5L, authentication);
+
+        assertThat(response.getStatusCode().is2xxSuccessful()).isTrue();
+        assertThat(response.getBody()).isNotNull();
+        assertThat(response.getBody().getStatus()).isEqualTo(TicketRequestStatus.WAITING);
+        assertThat(response.getHeaders().getFirst("Deprecation")).isNull();
+        verify(ticketStatusService).getStatus("5", "77");
     }
 }

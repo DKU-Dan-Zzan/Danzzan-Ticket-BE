@@ -9,8 +9,8 @@ USERS="${USERS:-1500}"
 CONCURRENCY="${CONCURRENCY:-1500}"
 TIMEOUT_SEC="${TIMEOUT_SEC:-5}"
 MAX_P95_MS="${MAX_P95_MS:-2000}"
-OUTPUT_DIR="${OUTPUT_DIR:-reports/loadtest/raw}"
-REPORT_DIR="${REPORT_DIR:-reports/loadtest}"
+OUTPUT_DIR="${OUTPUT_DIR:-reports/loadtest/raw/claim-v2}"
+REPORT_DIR="${REPORT_DIR:-reports/loadtest/reports/claim-v2}"
 ADMIN_STUDENT_ID="${ADMIN_STUDENT_ID:-1234}"
 ADMIN_PASSWORD="${ADMIN_PASSWORD:-1234}"
 
@@ -26,8 +26,8 @@ Options:
   --concurrency N           parallel requests (default: 1500)
   --timeout-sec N           curl timeout sec (default: 5)
   --max-p95-ms N            p95 threshold ms (default: 2000)
-  --output-dir DIR          loadtest raw output dir (default: reports/loadtest/raw)
-  --report-dir DIR          aggregate report dir (default: reports/loadtest)
+  --output-dir DIR          loadtest raw output dir (default: reports/loadtest/raw/claim-v2)
+  --report-dir DIR          aggregate report dir (default: reports/loadtest/reports/claim-v2)
   --admin-student-id ID     admin login id (default: 1234)
   --admin-password PW       admin login password (default: 1234)
   -h, --help                show help

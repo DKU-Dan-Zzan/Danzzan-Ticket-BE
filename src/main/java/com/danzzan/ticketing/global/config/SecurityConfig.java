@@ -48,7 +48,7 @@ public class SecurityConfig {
                         .requestMatchers("/user/{signup-token}").permitAll()
                         // 이벤트 목록은 비로그인도 조회 가능
                         .requestMatchers("/tickets/events").permitAll()
-                        // Redis 기반 선착순 계약 API (스캐폴딩 단계, 26-02-24 추가)
+                        // 레거시 v1 호환 API (신규는 인증 기반 /tickets/{eventId}/queue/* 사용)
                         .requestMatchers("/tickets/request", "/tickets/status").permitAll()
                         // Redis 연결 테스트 API (로컬검증용 테스트api 인증없이 호출 가능하도록, 26-02-24 추가)
                         .requestMatchers("/tickets/redis/**").permitAll()

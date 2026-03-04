@@ -8,7 +8,7 @@ STOCK="${STOCK:-1000}"
 USERS="${USERS:-1500}"
 CONCURRENCY="${CONCURRENCY:-200}"
 TIMEOUT_SEC="${TIMEOUT_SEC:-5}"
-OUTPUT_DIR="${OUTPUT_DIR:-reports/loadtest/raw}"
+OUTPUT_DIR="${OUTPUT_DIR:-reports/loadtest/raw/claim-v2}"
 INIT_ENABLED=false
 DRY_RUN=false
 
@@ -23,7 +23,7 @@ Options:
   --users N              number of requests/users (default: 1500)
   --concurrency N        parallel workers (default: 200)
   --timeout-sec N        per-request timeout sec for curl (default: 5)
-  --output-dir DIR       raw output directory (default: reports/loadtest/raw)
+  --output-dir DIR       raw output directory (default: reports/loadtest/raw/claim-v2)
   --init                 call admin init API before load
   --dry-run              validate parameters and print execution plan only
   -h, --help             show help

@@ -1,5 +1,7 @@
 # Claim v2 로컬 부하테스트 실행 가이드
 
+공통 산출물 디렉토리 규칙은 `docs/loadtest-artifacts-layout.md`를 따른다.
+
 ## 0) 템플릿 기준 진행 현황 (2026-02-27)
 - [x] 동시 1000 요청에서 초과 발급 0
 - 근거: 1500 동시 요청/stock 1000에서 `SUCCESS=1000`으로 상한 초과 발급 없음.
@@ -20,7 +22,7 @@
 
 ### 완료 기준
 - [x] 정확성(집계 기대값 일치, 초과/중복 발급 0) + p95 2초 + 오류율 0% 동시 만족
-- 최종 PASS 리포트: `reports/loadtest/claim-v2-20260227-133808.md`
+- 최종 PASS 리포트: `reports/loadtest/reports/claim-v2/claim-v2-20260227-133808.md`
 
 ## 1) 목적/판정 기준
 - 대상: Redis Lua v2 기반 Claim 경로 (`POST /tickets/request`)
@@ -89,7 +91,7 @@ ADMIN_TOKEN="$ADMIN_TOKEN" scripts/loadtest_ticket_claim.sh \
 
 3. 최근 CSV 확인
 ```bash
-LATEST_CSV="$(ls -t reports/loadtest/raw/claim-v2-*.csv | head -n1)"
+LATEST_CSV="$(ls -t reports/loadtest/raw/claim-v2/claim-v2-*.csv | head -n1)"
 echo "$LATEST_CSV"
 ```
 
@@ -105,10 +107,10 @@ scripts/aggregate_ticket_claim_results.sh \
 
 ## 4) 산출물 경로
 - Raw 결과:
-  - `reports/loadtest/raw/claim-v2-*.csv`
-  - `reports/loadtest/raw/claim-v2-*.json`
+  - `reports/loadtest/raw/claim-v2/claim-v2-*.csv`
+  - `reports/loadtest/raw/claim-v2/claim-v2-*.json`
 - 판정 리포트:
-  - `reports/loadtest/claim-v2-*.md`
+  - `reports/loadtest/reports/claim-v2/claim-v2-*.md`
 
 ## 5) dry-run / 샘플 검증
 - 부하 스크립트 dry-run:
@@ -127,12 +129,12 @@ scripts/aggregate_ticket_claim_results.sh \
 
 ## 6) 주의사항
 - `reports/loadtest/raw/*` 원시 산출물은 `.gitignore` 대상이다.
-- `reports/loadtest/*.md` 리포트는 필요 시 커밋 가능하다.
+- `reports/loadtest/reports/claim-v2/*.md` 리포트는 필요 시 커밋 가능하다.
 - 기준 미달(`FAIL`) 시 원인 메모를 리포트에 남기고, 기능 코드 수정은 별도 브랜치에서 진행한다.
 
 ## 7) 리포트 정리 규칙
-- 기준 리포트는 `reports/loadtest/`의 **최신 PASS 1건**이다.
-- FAIL 리포트는 `reports/loadtest/archive/`로 이동해 이력만 보관한다.
+- 기준 리포트는 `reports/loadtest/reports/claim-v2/`의 **최신 PASS 1건**이다.
+- FAIL 리포트는 `reports/loadtest/archive/claim-v2/`로 이동해 이력만 보관한다.
 - PASS 히스토리를 줄이고 싶으면 최신 PASS를 제외한 PASS도 archive로 이동할 수 있다.
 
 정리 스크립트:

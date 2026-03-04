@@ -7,7 +7,7 @@ EXPECTED_SUCCESS="${EXPECTED_SUCCESS:-1000}"
 EXPECTED_SOLD_OUT="${EXPECTED_SOLD_OUT:-500}"
 EXPECTED_ALREADY="${EXPECTED_ALREADY:-0}"
 MAX_P95_MS="${MAX_P95_MS:-2000}"
-REPORT_DIR="${REPORT_DIR:-reports/loadtest}"
+REPORT_DIR="${REPORT_DIR:-reports/loadtest/reports/claim-v2}"
 STRICT=false
 
 usage() {
@@ -20,7 +20,7 @@ Options:
   --expected-sold-out N     expected SOLD_OUT count (default: 500)
   --expected-already N      expected ALREADY count (default: 0)
   --max-p95-ms N            p95 threshold in milliseconds (default: 2000)
-  --report-dir DIR          report output dir (default: reports/loadtest)
+  --report-dir DIR          report output dir (default: reports/loadtest/reports/claim-v2)
   --strict                  exit with non-zero code when verdict is FAIL
   -h, --help                show help
 USAGE

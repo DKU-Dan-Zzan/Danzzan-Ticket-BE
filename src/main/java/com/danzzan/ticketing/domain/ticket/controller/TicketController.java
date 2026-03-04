@@ -29,6 +29,10 @@ import java.util.Set;
 @Tag(name = "사용자 티켓팅", description = "공연 티켓 예매 및 조회 API")
 public class TicketController {
 
+    private static final String LEGACY_SUNSET_DATE = "Tue, 30 Jun 2026 23:59:59 GMT";
+    private static final String HEADER_DEPRECATION = "Deprecation";
+    private static final String HEADER_SUNSET = "Sunset";
+
     private static final Set<TicketRequestStatus> CLAIM_TERMINAL_STATUSES = Set.of(
             TicketRequestStatus.SUCCESS,
             TicketRequestStatus.SOLD_OUT,
@@ -65,38 +69,85 @@ public class TicketController {
         return ResponseEntity.ok(response);
     }
 
+    @PostMapping("/{eventId}/queue/enter")
+    @Operation(summary = "대기열 진입", description = "인증 사용자 기준으로 대기열에 진입하고 ADMITTED인 경우 즉시 claim을 수행합니다.")
+    public ResponseEntity<TicketRequestResponseDTO> enterQueue(
+            @PathVariable Long eventId,
+            Authentication authentication
+    ) {
+        Long userId = (Long) authentication.getPrincipal();
+        TicketRequestResponseDTO response = enterQueueAndClaim(String.valueOf(eventId), String.valueOf(userId));
+        return ResponseEntity.ok(response);
+    }
+
+    @GetMapping("/{eventId}/queue/status")
+    @Operation(summary = "대기열 상태 조회", description = "인증 사용자 기준으로 대기열 상태를 조회합니다.")
+    public ResponseEntity<TicketStatusResponseDTO> getQueueStatus(
+            @PathVariable Long eventId,
+            Authentication authentication
+    ) {
+        Long userId = (Long) authentication.getPrincipal();
+        TicketStatusResponseDTO response = ticketStatus(String.valueOf(eventId), String.valueOf(userId));
+        return ResponseEntity.ok(response);
+    }
+
     @PostMapping("/request")
-    @Operation(summary = "티켓 요청(v1)", description = "Admission 통과 시 Claim을 수행해 SUCCESS/SOLD_OUT/ALREADY를 반환합니다.")
+    @Operation(
+            summary = "티켓 요청(v1, deprecated)",
+            description = "레거시 호환용 엔드포인트입니다. 신규 클라이언트는 /tickets/{eventId}/queue/enter 사용을 권장합니다.",
+            deprecated = true
+    )
     public ResponseEntity<TicketRequestResponseDTO> requestTicket(
             @Valid @RequestBody TicketRequestRequestDTO request
     ) {
-        TicketRequestStatus admissionStatus = admissionService.admit(request.getEventId(), request.getUserId());
+        TicketRequestResponseDTO response = enterQueueAndClaim(request.getEventId(), request.getUserId());
+        return legacyResponse(response);
+    }
+
+    @GetMapping("/status")
+    @Operation(
+            summary = "티켓 상태 조회(v1, deprecated)",
+            description = "레거시 호환용 엔드포인트입니다. 신규 클라이언트는 /tickets/{eventId}/queue/status 사용을 권장합니다.",
+            deprecated = true
+    )
+    public ResponseEntity<TicketStatusResponseDTO> getTicketStatus(
+            @Valid @ModelAttribute TicketStatusRequestDTO request
+    ) {
+        TicketStatusResponseDTO response = ticketStatus(request.getEventId(), request.getUserId());
+        return legacyResponse(response);
+    }
+
+    private TicketRequestResponseDTO enterQueueAndClaim(String eventId, String userId) {
+        TicketRequestStatus admissionStatus = admissionService.admit(eventId, userId);
         if (admissionStatus != TicketRequestStatus.ADMITTED) {
-            return ResponseEntity.ok(TicketRequestResponseDTO.builder()
+            return TicketRequestResponseDTO.builder()
                     .status(admissionStatus)
                     .remaining(null)
-                    .build());
+                    .build();
         }
 
-        ClaimResult claimResult = claimService.claim(request.getEventId(), request.getUserId());
+        ClaimResult claimResult = claimService.claim(eventId, userId);
         if (!CLAIM_TERMINAL_STATUSES.contains(claimResult.status())) {
             throw new IllegalStateException("claim status must be one of SUCCESS, SOLD_OUT, ALREADY");
         }
 
-        return ResponseEntity.ok(TicketRequestResponseDTO.builder()
+        return TicketRequestResponseDTO.builder()
                 .status(claimResult.status())
                 .remaining(claimResult.remaining())
-                .build());
+                .build();
     }
 
-    @GetMapping("/status")
-    @Operation(summary = "티켓 상태 조회(v1)", description = "status key를 조회하고 없으면 NONE을 반환합니다.")
-    public ResponseEntity<TicketStatusResponseDTO> getTicketStatus(
-            @Valid @ModelAttribute TicketStatusRequestDTO request
-    ) {
-        TicketRequestStatus status = ticketStatusService.getStatus(request.getEventId(), request.getUserId());
-        return ResponseEntity.ok(TicketStatusResponseDTO.builder()
+    private TicketStatusResponseDTO ticketStatus(String eventId, String userId) {
+        TicketRequestStatus status = ticketStatusService.getStatus(eventId, userId);
+        return TicketStatusResponseDTO.builder()
                 .status(status)
-                .build());
+                .build();
+    }
+
+    private <T> ResponseEntity<T> legacyResponse(T body) {
+        return ResponseEntity.ok()
+                .header(HEADER_DEPRECATION, "true")
+                .header(HEADER_SUNSET, LEGACY_SUNSET_DATE)
+                .body(body);
     }
 }
