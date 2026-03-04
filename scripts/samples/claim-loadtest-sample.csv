@@ -1,0 +1,7 @@
+request_id,user_id,http_code,time_total_ms,status,remaining,curl_exit,error_type
+1,loadtest-user-000001,200,18.120,SUCCESS,999,0,NONE
+2,loadtest-user-000002,200,19.430,SUCCESS,998,0,NONE
+3,loadtest-user-000003,200,20.001,SUCCESS,997,0,NONE
+4,loadtest-user-000004,200,21.100,SOLD_OUT,,0,NONE
+5,loadtest-user-000005,200,21.900,SOLD_OUT,,0,NONE
+6,loadtest-user-000006,500,30.250,PARSE_ERROR,,0,HTTP_ERROR
