@@ -74,5 +74,28 @@
 ### Status enum
 - `NONE`, `WAITING`, `ADMITTED`, `SUCCESS`, `SOLD_OUT`, `ALREADY`
 
+## Service Boundary
+- `TicketRequestStatus` is the only status type across request flow.
+- `AdmissionService` responsibility:
+  - Emits admission status only (`WAITING`, `ADMITTED`).
+  - Current stub implementation always returns `ADMITTED`.
+- `ClaimService` responsibility:
+  - Emits claim result only (`SUCCESS`, `SOLD_OUT`, `ALREADY`).
+  - `ClaimResult` signature is fixed to:
+    - `status: TicketRequestStatus`
+    - `remaining: Long?`
+  - `remaining` is used only when `status=SUCCESS`.
+  - `remaining` must be `null` when `status=SOLD_OUT|ALREADY`.
+- `TicketController` request flow is fixed:
+  - `admit` first.
+  - If admission status is not `ADMITTED`, do not call claim and return that status as-is.
+  - Only when `ADMITTED`, call claim and return `ClaimResult`.
+- Queue extension rule:
+  - When queue admission is introduced, replace `AdmissionService` only.
+  - Reuse `ClaimService` interface without signature changes.
+- Error extension point:
+  - `errorCode` is reserved for future extension and intentionally not included in current response schema.
+
 ## Implementation Note
-- Current endpoints are scaffold-only and return `501 Not Implemented`.
+- `POST /tickets/request` is wired to `admit -> claim` service boundary (stub stage).
+- `POST /api/admin/ticket/init` and `GET /tickets/status` remain scaffold endpoints (`501`) at this stage.
