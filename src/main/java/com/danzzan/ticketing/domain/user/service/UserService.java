@@ -41,7 +41,16 @@ public class UserService {
                 user.getId(), user.getStudentId(), user.getRole().name());
         String refreshToken = jwtTokenProvider.createRefreshToken(user.getId());
 
-        return new ResponseLoginDto(accessToken, refreshToken);
+        String roleStr = user.getRole().name().replace("ROLE_", "").toLowerCase();
+        ResponseLoginDto.UserInfo userInfo = new ResponseLoginDto.UserInfo(
+                String.valueOf(user.getId()),
+                user.getStudentId(),
+                user.getName(),
+                roleStr,
+                user.getMajor(),
+                user.getCollege()
+        );
+        return new ResponseLoginDto(accessToken, refreshToken, userInfo);
     }
 
     // 토큰 재발급
